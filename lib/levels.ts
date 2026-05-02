@@ -56,6 +56,8 @@ export const levels: Level[] = [
     playerStart: { x: 80, y: playerOnGround },
     worldWidth: 2400,
     platforms: [
+      // Stepping stone so the player can reach Platform 1 (y=300, has enemy).
+      { x: 440, y: 350, width: 100 },
       { x: 600, y: 300, width: 200 },
       { x: 1200, y: 240, width: 200 },
     ],
@@ -127,6 +129,8 @@ export const levels: Level[] = [
     worldWidth: 2400,
     platforms: [
       { x: 500, y: 320, width: 180 },
+      // Stepping stone so the player can reach Platform 2 (y=260, has enemy).
+      { x: 760, y: 340, width: 100 },
       { x: 900, y: 260, width: 160 },
       { x: 1400, y: 300, width: 200 },
     ],
@@ -198,7 +202,11 @@ export const levels: Level[] = [
     playerStart: { x: 80, y: 360 },
     worldWidth: 2400,
     platforms: [
-      { x: 400, y: 310, width: 200 },
+      // Lowered from y=310 to y=320 so it's reachable from the ground in
+      // one jump without needing a stepping stone.
+      { x: 400, y: 320, width: 200 },
+      // Stepping stone so the player can reach Platform 2 (y=270, has enemy).
+      { x: 660, y: 340, width: 100 },
       { x: 800, y: 270, width: 180 },
       { x: 1300, y: 320, width: 220 },
     ],
@@ -225,7 +233,7 @@ export const levels: Level[] = [
       {
         enemyId: "catalog-dropoffs",
         x: 420,
-        y: 310 - ENEMY_H,
+        y: 320 - ENEMY_H,
         patrolMin: 400,
         patrolMax: 600 - ENEMY_H,
       },
@@ -273,7 +281,12 @@ export const levels: Level[] = [
     platforms: [
       { x: 400, y: 320, width: 180 },
       { x: 800, y: 260, width: 160 },
+      // Stepping stone so the player can reach Platform 3 (y=290, has enemy).
+      { x: 1170, y: 350, width: 100 },
       { x: 1300, y: 290, width: 200 },
+      // Stepping stone so the player can reach Platform 4 (y=240, has the
+      // pass-through DAU/MAU enemy).
+      { x: 1640, y: 320, width: 100 },
       { x: 1800, y: 240, width: 180 },
     ],
     flagPosition: { x: 2700, y: GROUND_Y },
@@ -323,16 +336,13 @@ export const levels: Level[] = [
         patrolMax: 1500 - ENEMY_H,
       },
       {
-        // Placed on the ground between Platform 4 and the flag so the player
-        // must clear it to win. Patrol range leaves enough clear approach
-        // (~250px from Platform 4 end at x=1980) and landing room before the
-        // flag at x=2700, but it's narrow enough that the bounce/jump timing
-        // matters.
+        // Patrols on Platform 4 — physics treats this enemy as pass-through
+        // (see Game.tsx). Visual + STILL FIGHTING badge in the modal only.
         enemyId: "dau-mau-stickiness",
-        x: 2300,
-        y: onGround,
-        patrolMin: 2250,
-        patrolMax: 2450 - ENEMY_H,
+        x: 1820,
+        y: 240 - ENEMY_H,
+        patrolMin: 1800,
+        patrolMax: 1980 - ENEMY_H,
       },
     ],
     caseStudy: {

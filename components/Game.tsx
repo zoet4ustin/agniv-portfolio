@@ -273,6 +273,10 @@ export default function Game({ level, onLevelComplete }: Props) {
           e.vx = -Math.abs(e.vx);
         }
 
+        // The ongoing battle is pass-through: never kills the player, never
+        // dies. Player can run/jump straight through it.
+        if (e.isCurrentBattle) continue;
+
         const overlap =
           s.px + PLAYER_W > e.x &&
           s.px < e.x + ENEMY_W &&
@@ -282,18 +286,10 @@ export default function Game({ level, onLevelComplete }: Props) {
 
         const playerBottom = s.py + PLAYER_H;
         if (s.vy > 0 && playerBottom - e.y < 18) {
-          if (e.isCurrentBattle) {
-            // Indestructible: bounce the player but keep the enemy alive.
-            // Snap to the enemy's top so the bounce starts cleanly.
-            s.py = e.y - PLAYER_H;
-            s.vy = JUMP_V * 0.6;
-            s.onGround = false;
-          } else {
-            e.alive = false;
-            s.vy = JUMP_V * 0.6;
-            setSolutions((c) => c + 1);
-            showToast(e.solution);
-          }
+          e.alive = false;
+          s.vy = JUMP_V * 0.6;
+          setSolutions((c) => c + 1);
+          showToast(e.solution);
         } else {
           respawn();
           break;
