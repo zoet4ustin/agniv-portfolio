@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Level } from "@/lib/levels";
+import { ASSETS } from "@/lib/assets";
+import { AnimatedSprite, StaticImage } from "@/lib/sprite";
 import MobileControls, { type MobileKey } from "./MobileControls";
 
 type Props = {
@@ -13,6 +15,7 @@ type Props = {
 const CANVAS_W = 960;
 const CANVAS_H = 480;
 const GROUND_Y = 400;
+const TILE = 16;
 const PLATFORM_H = 16;
 const PLAYER_W = 32;
 const PLAYER_H = 40;
@@ -26,6 +29,7 @@ const FRICTION = 0.7;
 const MAX_FALL = 14;
 
 const TICK_MS = 1000 / 60;
+const TOAST_MS = 4000;
 
 type EnemyState = {
   id: string;
@@ -40,12 +44,14 @@ type EnemyState = {
   alive: boolean;
 };
 
+type ToastPayload = { problem: string; solution: string };
+
 function buildEnemies(level: Level): EnemyState[] {
   return level.enemyPlacements.map((p) => {
     const e = level.enemies.find((en) => en.id === p.enemyId);
     if (!e) {
       throw new Error(
-        `Enemy "${p.enemyId}" referenced in placements not found in level "${level.slug}"`
+        `Enemy "${p.enemyId}" not found in level "${level.slug}"`
       );
     }
     return {
@@ -81,10 +87,12 @@ type State = {
   completed: boolean;
 };
 
+type PlayerAnim = "idle" | "run" | "jump" | "fall";
+
 export default function Game({ level, onLevelComplete }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [solutions, setSolutions] = useState(0);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastPayload | null>(null);
   const [toastShown, setToastShown] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
 
@@ -104,6 +112,7 @@ export default function Game({ level, onLevelComplete }: Props) {
     enemies: buildEnemies(level),
     completed: false,
   });
+  const facingRef = useRef<1 | -1>(1);
   const toastTimerRef = useRef<number | null>(null);
   const toastHideTimerRef = useRef<number | null>(null);
   const onCompleteRef = useRef(onLevelComplete);
@@ -121,6 +130,7 @@ export default function Game({ level, onLevelComplete }: Props) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
+  // Keyboard
   useEffect(() => {
     const isJumpKey = (k: string) =>
       k === "ArrowUp" || k === "w" || k === "W" || k === " " || k === "Spacebar";
@@ -154,7 +164,7 @@ export default function Game({ level, onLevelComplete }: Props) {
     };
   }, []);
 
-  const showToast = useCallback((text: string) => {
+  const showToast = useCallback((payload: ToastPayload) => {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
       toastTimerRef.current = null;
@@ -163,7 +173,7 @@ export default function Game({ level, onLevelComplete }: Props) {
       clearTimeout(toastHideTimerRef.current);
       toastHideTimerRef.current = null;
     }
-    setToast(text);
+    setToast(payload);
     setToastShown(false);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => setToastShown(true));
@@ -173,7 +183,7 @@ export default function Game({ level, onLevelComplete }: Props) {
       toastHideTimerRef.current = window.setTimeout(() => {
         setToast(null);
       }, 320);
-    }, 3000);
+    }, TOAST_MS);
   }, []);
 
   // Game loop — re-runs when level changes (Game is also keyed on slug in PlayClient)
@@ -183,6 +193,16 @@ export default function Game({ level, onLevelComplete }: Props) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Sprites — load once per mount.
+    const sprites: Record<PlayerAnim, AnimatedSprite> = {
+      idle: new AnimatedSprite(ASSETS.player.idle),
+      run: new AnimatedSprite(ASSETS.player.run),
+      jump: new AnimatedSprite(ASSETS.player.jump),
+      fall: new AnimatedSprite(ASSETS.player.fall),
+    };
+    const terrainAtlas = new StaticImage(ASSETS.terrain.src);
+    const flagSprite = new StaticImage(ASSETS.flag.idle);
+
     const platforms = level.platforms;
     const worldWidth = level.worldWidth;
     const flagX = level.flagPosition.x;
@@ -190,6 +210,10 @@ export default function Game({ level, onLevelComplete }: Props) {
     const sky = level.skyColor;
     const ground = level.groundColor;
     const groundDark = darken(ground, 0.25);
+
+    // Pre-compute ground tile layout (col grid).
+    const groundCols = Math.ceil(worldWidth / TILE);
+    const groundRows = Math.ceil((CANVAS_H - GROUND_Y) / TILE);
 
     const respawn = () => {
       const s = stateRef.current;
@@ -209,24 +233,23 @@ export default function Game({ level, onLevelComplete }: Props) {
       const k = keysRef.current;
       if (s.completed) return;
 
-      // Horizontal input
       if (k.left && !k.right) s.vx = -MOVE_SPEED;
       else if (k.right && !k.left) s.vx = MOVE_SPEED;
       else s.vx *= FRICTION;
       if (Math.abs(s.vx) < 0.05) s.vx = 0;
 
-      // Jump
+      if (s.vx > 0.1) facingRef.current = 1;
+      else if (s.vx < -0.1) facingRef.current = -1;
+
       if (k.jumpQueued && s.onGround) {
         s.vy = JUMP_V;
         s.onGround = false;
       }
       k.jumpQueued = false;
 
-      // Gravity
       s.vy += GRAVITY;
       if (s.vy > MAX_FALL) s.vy = MAX_FALL;
 
-      // Horizontal move + bounds
       s.px += s.vx;
       if (s.px < 0) {
         s.px = 0;
@@ -237,11 +260,9 @@ export default function Game({ level, onLevelComplete }: Props) {
         s.vx = 0;
       }
 
-      // Vertical move
       const prevBottom = s.py + PLAYER_H - s.vy;
       s.py += s.vy;
 
-      // Ground collision
       s.onGround = false;
       if (s.py + PLAYER_H >= GROUND_Y) {
         s.py = GROUND_Y - PLAYER_H;
@@ -249,7 +270,6 @@ export default function Game({ level, onLevelComplete }: Props) {
         s.onGround = true;
       }
 
-      // Platform collisions (top-only)
       for (const p of platforms) {
         const overlapsX = s.px + PLAYER_W > p.x && s.px < p.x + p.width;
         const enteringTop = prevBottom <= p.y && s.py + PLAYER_H >= p.y;
@@ -260,7 +280,6 @@ export default function Game({ level, onLevelComplete }: Props) {
         }
       }
 
-      // Enemies
       for (const e of s.enemies) {
         if (!e.alive) continue;
         e.x += e.vx;
@@ -273,8 +292,6 @@ export default function Game({ level, onLevelComplete }: Props) {
           e.vx = -Math.abs(e.vx);
         }
 
-        // The ongoing battle is pass-through: never kills the player, never
-        // dies. Player can run/jump straight through it.
         if (e.isCurrentBattle) continue;
 
         const overlap =
@@ -289,14 +306,13 @@ export default function Game({ level, onLevelComplete }: Props) {
           e.alive = false;
           s.vy = JUMP_V * 0.6;
           setSolutions((c) => c + 1);
-          showToast(e.solution);
+          showToast({ problem: e.label, solution: e.solution });
         } else {
           respawn();
           break;
         }
       }
 
-      // Camera lerp toward player center
       const target = clamp(
         s.px - CANVAS_W / 2 + PLAYER_W / 2,
         0,
@@ -304,25 +320,29 @@ export default function Game({ level, onLevelComplete }: Props) {
       );
       s.cameraX += (target - s.cameraX) * 0.1;
 
-      // Flag
       if (!s.completed && s.px >= flagX) {
         s.completed = true;
         onCompleteRef.current();
       }
     };
 
-    const render = () => {
-      const s = stateRef.current;
+    const pickAnim = (s: State): PlayerAnim => {
+      if (!s.onGround) return s.vy < 0 ? "jump" : "fall";
+      return Math.abs(s.vx) > 0.5 ? "run" : "idle";
+    };
 
-      // Sky
+    const render = (frameDeltaMs: number) => {
+      const s = stateRef.current;
+      ctx.imageSmoothingEnabled = false;
+
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-      // Wispy parallax clouds — slight transparency reads against any sky
+      // Parallax wisp clouds.
       ctx.fillStyle = "rgba(255,255,255,0.35)";
       for (let i = 0; i < 5; i++) {
         const cx =
-          ((i * 600 - s.cameraX * 0.3) % (worldWidth + 400) +
+          (((i * 600 - s.cameraX * 0.3) % (worldWidth + 400)) +
             (worldWidth + 400)) %
             (worldWidth + 400) -
           200;
@@ -332,31 +352,99 @@ export default function Game({ level, onLevelComplete }: Props) {
       ctx.save();
       ctx.translate(-Math.round(s.cameraX), 0);
 
-      // Ground
-      ctx.fillStyle = ground;
-      ctx.fillRect(0, GROUND_Y, worldWidth, CANVAS_H - GROUND_Y);
-      ctx.fillStyle = groundDark;
-      ctx.fillRect(0, GROUND_Y, worldWidth, 4);
-
-      // Platforms
-      for (const p of platforms) {
-        ctx.fillStyle = "#8B4513";
-        ctx.fillRect(p.x, p.y, p.width, PLATFORM_H);
-        ctx.fillStyle = "#6e3710";
-        ctx.fillRect(p.x, p.y, p.width, 3);
+      // Ground — tile if atlas loaded, else fill rect (so the level still
+      // renders before the texture finishes loading).
+      const atlasImg = terrainAtlas.image;
+      if (atlasImg) {
+        const gt = ASSETS.terrain.tiles.grassTop;
+        const df = ASSETS.terrain.tiles.dirtFill;
+        const camTileMin = Math.floor(s.cameraX / TILE) - 1;
+        const camTileMax = Math.ceil((s.cameraX + CANVAS_W) / TILE) + 1;
+        const lo = Math.max(0, camTileMin);
+        const hi = Math.min(groundCols, camTileMax);
+        for (let col = lo; col < hi; col++) {
+          const x = col * TILE;
+          ctx.drawImage(atlasImg, gt.x, gt.y, TILE, TILE, x, GROUND_Y, TILE, TILE);
+          for (let row = 1; row < groundRows; row++) {
+            ctx.drawImage(
+              atlasImg,
+              df.x,
+              df.y,
+              TILE,
+              TILE,
+              x,
+              GROUND_Y + row * TILE,
+              TILE,
+              TILE
+            );
+          }
+        }
+      } else {
+        ctx.fillStyle = ground;
+        ctx.fillRect(0, GROUND_Y, worldWidth, CANVAS_H - GROUND_Y);
+        ctx.fillStyle = groundDark;
+        ctx.fillRect(0, GROUND_Y, worldWidth, 4);
       }
 
-      // Flag
-      drawFlag(ctx, flagX, flagY, level.theme);
+      // Platforms — tile if atlas loaded, else solid block.
+      for (const p of platforms) {
+        if (atlasImg) {
+          const pt = ASSETS.terrain.tiles.platform;
+          const cols = Math.max(1, Math.round(p.width / TILE));
+          for (let i = 0; i < cols; i++) {
+            ctx.drawImage(
+              atlasImg,
+              pt.x,
+              pt.y,
+              TILE,
+              TILE,
+              p.x + i * TILE,
+              p.y,
+              TILE,
+              TILE
+            );
+          }
+        } else {
+          ctx.fillStyle = "#8B4513";
+          ctx.fillRect(p.x, p.y, p.width, PLATFORM_H);
+          ctx.fillStyle = "#6e3710";
+          ctx.fillRect(p.x, p.y, p.width, 3);
+        }
+      }
 
-      // Enemies
+      // Flag — End (Idle) sprite if loaded, else stylized fallback.
+      const flagImg = flagSprite.image;
+      if (flagImg) {
+        const fSize = ASSETS.flag.size;
+        ctx.drawImage(flagImg, flagX - fSize / 2, flagY - fSize, fSize, fSize);
+      } else {
+        drawFlagFallback(ctx, flagX, flagY, level.theme);
+      }
+
+      // Enemies — pixel-styled rectangles. (Pack ships no enemy spritesheets;
+      // see lib/assets.ts and the README note.)
       for (const e of s.enemies) {
         if (!e.alive) continue;
         drawEnemy(ctx, e);
       }
 
-      // Player
-      drawPlayer(ctx, s.px, s.py, s.vx);
+      // Player — animated sprite. Update + draw the active anim.
+      const anim = pickAnim(s);
+      sprites[anim].update(frameDeltaMs);
+      const flipped = facingRef.current < 0;
+      // Sprite is 32x32; align bottom with hitbox bottom (py + PLAYER_H).
+      const drewSprite = sprites[anim].draw(
+        ctx,
+        Math.round(s.px),
+        Math.round(s.py + PLAYER_H - 32),
+        flipped
+      );
+      if (!drewSprite) {
+        // Sprite not loaded yet — hitbox-shaped placeholder so the player
+        // is still visible during the first few frames.
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.fillRect(s.px, s.py, PLAYER_W, PLAYER_H);
+      }
 
       ctx.restore();
     };
@@ -369,7 +457,7 @@ export default function Game({ level, onLevelComplete }: Props) {
         physicsStep();
         acc -= TICK_MS;
       }
-      render();
+      render(elapsed);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -408,7 +496,7 @@ export default function Game({ level, onLevelComplete }: Props) {
           height={CANVAS_H}
           tabIndex={0}
           onClick={(e) => e.currentTarget.focus()}
-          className="block h-auto w-full max-w-[100vw] outline-none"
+          className="block h-auto w-full max-w-[100vw] outline-none [image-rendering:pixelated]"
           style={{ aspectRatio: "2 / 1", touchAction: "none" }}
           aria-label={`${level.locationName} game canvas`}
         />
@@ -432,15 +520,42 @@ export default function Game({ level, onLevelComplete }: Props) {
         {toast && (
           <div
             role="status"
-            className="pointer-events-none absolute left-1/2 top-12 z-20 max-w-[85%] transition-all duration-300 ease-out sm:top-14"
+            aria-live="polite"
+            className="pointer-events-none absolute left-1/2 top-10 z-30 w-[min(360px,90%)] sm:top-12"
             style={{
-              transform: `translateX(-50%) translateY(${toastShown ? "0" : "-2.5rem"})`,
-              opacity: toastShown ? 1 : 0,
+              animation: toastShown
+                ? "lootDropIn 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards"
+                : "lootDropOut 0.3s ease-in forwards",
             }}
           >
-            <div className="rounded-md border border-emerald-400/50 bg-emerald-500/15 px-4 py-2 text-center text-xs font-medium text-emerald-100 shadow-lg backdrop-blur sm:text-sm">
-              <span className="mr-1 font-bold text-emerald-300">✓</span>
-              {toast}
+            <div
+              className="rounded-md border-2 bg-zinc-950/95 px-4 py-3 shadow-2xl backdrop-blur"
+              style={{ borderColor: "#f5c518" }}
+            >
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-amber-400" aria-hidden>
+                  ★
+                </span>
+                <span
+                  className="font-pixel text-[10px] uppercase tracking-[0.2em] text-amber-300"
+                >
+                  Solution Unlocked
+                </span>
+              </div>
+              <div className="space-y-1 font-mono text-[11px] leading-snug text-zinc-200 sm:text-xs">
+                <p>
+                  <span className="text-zinc-500">Problem:</span> {toast.problem}
+                </p>
+                <p>
+                  <span className="text-zinc-500">Solution:</span>{" "}
+                  {toast.solution}
+                </p>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <span className="rounded-sm border border-amber-400/60 bg-amber-400/15 px-2 py-0.5 font-pixel text-[9px] uppercase tracking-widest text-amber-200">
+                  +1 Solution
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -481,7 +596,7 @@ function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.fill();
 }
 
-function drawFlag(
+function drawFlagFallback(
   ctx: CanvasRenderingContext2D,
   x: number,
   groundY: number,
@@ -498,8 +613,6 @@ function drawFlag(
   ctx.lineTo(x + 6, top + 30);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "#3d8c3a";
-  ctx.fillRect(x - 6, groundY - 4, 18, 4);
 }
 
 function drawEnemy(ctx: CanvasRenderingContext2D, e: EnemyState) {
@@ -525,30 +638,3 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: EnemyState) {
   ctx.fillRect(e.x + 5 + pupilOffset, e.y + 9, 3, 3);
   ctx.fillRect(e.x + ENEMY_W - 11 + pupilOffset, e.y + 9, 3, 3);
 }
-
-function drawPlayer(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  vx: number
-) {
-  ctx.fillStyle = "#2563eb";
-  ctx.fillRect(x, y + 10, PLAYER_W, PLAYER_H - 10);
-  ctx.fillStyle = "#1d3f96";
-  ctx.fillRect(x, y + 24, PLAYER_W, 3);
-  ctx.fillStyle = "#f3d9b1";
-  ctx.fillRect(x + 4, y, PLAYER_W - 8, 14);
-  const facing = vx >= 0 ? 1 : -1;
-  ctx.fillStyle = "#000";
-  if (facing > 0) {
-    ctx.fillRect(x + 18, y + 5, 3, 3);
-    ctx.fillRect(x + 24, y + 5, 3, 3);
-  } else {
-    ctx.fillRect(x + 5, y + 5, 3, 3);
-    ctx.fillRect(x + 11, y + 5, 3, 3);
-  }
-  ctx.fillStyle = "#dc2626";
-  ctx.fillRect(x + 2, y - 2, PLAYER_W - 4, 4);
-  ctx.fillRect(x + (facing > 0 ? PLAYER_W - 10 : 2), y - 4, 8, 4);
-}
-

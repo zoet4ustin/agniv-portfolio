@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 export type MobileKey = "left" | "right" | "jump";
@@ -9,6 +10,14 @@ type Props = {
 };
 
 export default function MobileControls({ onPress }: Props) {
+  // Pulse for the first 3s after mount so first-time players notice the
+  // controls. Disabled afterward so it doesn't keep moving while playing.
+  const [showPulse, setShowPulse] = useState(true);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowPulse(false), 3000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const bind = (key: MobileKey) => ({
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
@@ -24,16 +33,29 @@ export default function MobileControls({ onPress }: Props) {
     onContextMenu: (e: ReactPointerEvent<HTMLButtonElement>) => e.preventDefault(),
   });
 
+  const baseBtn =
+    "grid place-items-center rounded-full border text-white shadow-lg backdrop-blur transition select-none active:scale-95";
+  const pulseClass = showPulse ? "animate-touch-pulse" : "";
+  const dpadStyle = {
+    background: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.4)",
+  } as const;
+  const jumpStyle = {
+    background: "rgba(245,197,24,0.2)",
+    borderColor: "rgba(245,197,24,0.55)",
+  } as const;
+
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex items-end justify-between px-4 sm:px-6"
+      className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex items-end justify-between px-5 sm:bottom-6 sm:px-7"
       style={{ touchAction: "none" }}
     >
       <div className="pointer-events-auto flex gap-3">
         <button
           type="button"
           aria-label="Move left"
-          className="grid h-14 w-14 place-items-center rounded-full border border-white/30 bg-black/55 text-2xl font-bold text-white shadow-lg backdrop-blur active:bg-black/80"
+          className={`${baseBtn} ${pulseClass} h-[60px] w-[60px] text-2xl font-bold`}
+          style={dpadStyle}
           {...bind("left")}
         >
           ←
@@ -41,7 +63,8 @@ export default function MobileControls({ onPress }: Props) {
         <button
           type="button"
           aria-label="Move right"
-          className="grid h-14 w-14 place-items-center rounded-full border border-white/30 bg-black/55 text-2xl font-bold text-white shadow-lg backdrop-blur active:bg-black/80"
+          className={`${baseBtn} ${pulseClass} h-[60px] w-[60px] text-2xl font-bold`}
+          style={dpadStyle}
           {...bind("right")}
         >
           →
@@ -51,7 +74,8 @@ export default function MobileControls({ onPress }: Props) {
         <button
           type="button"
           aria-label="Jump"
-          className="grid h-16 w-16 place-items-center rounded-full border border-white/30 bg-emerald-500/80 text-xs font-black uppercase tracking-widest text-white shadow-lg backdrop-blur active:bg-emerald-600"
+          className={`${baseBtn} ${pulseClass} h-[68px] w-[68px] text-[10px] font-black uppercase tracking-[0.18em]`}
+          style={jumpStyle}
           {...bind("jump")}
         >
           Jump

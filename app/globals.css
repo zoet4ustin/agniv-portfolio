@@ -1,26 +1,74 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-jet-mono);
+  --font-mono: var(--font-jet-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-jet-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Pixel display font, used for headings and HUD chrome. */
+.font-pixel {
+  font-family: var(--font-press-start), ui-monospace, monospace;
+  letter-spacing: 0.02em;
+}
+
+/* Loot toast animations. */
+@keyframes lootDropIn {
+  0%   { transform: translate(-50%, -120%) scale(0.85); opacity: 0; }
+  60%  { transform: translate(-50%, 8%)    scale(1.05); opacity: 1; }
+  100% { transform: translate(-50%, 0)     scale(1);    opacity: 1; }
+}
+@keyframes lootDropOut {
+  0%   { transform: translate(-50%, 0)     scale(1);    opacity: 1; }
+  100% { transform: translate(-50%, -120%) scale(0.95); opacity: 0; }
+}
+
+/* Touch button attention pulse — runs for ~3s on first load. */
+@keyframes touchPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.45); }
+  50%      { box-shadow: 0 0 0 10px rgba(255,255,255,0); }
+}
+.animate-touch-pulse {
+  animation: touchPulse 1.4s ease-out 3;
+}
+
+/* Rotate-phone hint. */
+@keyframes rotatePhone {
+  0%, 30%   { transform: rotate(0deg); }
+  60%, 100% { transform: rotate(-90deg); }
+}
+.animate-rotate-phone {
+  animation: rotatePhone 2.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+/* Caret blink for "PRESS START" hero. */
+@keyframes blink {
+  0%, 50%   { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.animate-caret { animation: blink 1.1s steps(1, end) infinite; }
+
+/* Section fade-in for the story page. */
+@keyframes fadeUp {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.7s ease-out both; }
+
+/* Smooth scroll for the landing page sections. */
+html {
+  scroll-behavior: smooth;
 }

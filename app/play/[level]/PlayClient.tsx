@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Level } from "@/lib/levels";
 import Game from "@/components/Game";
 import CaseStudyModal from "@/components/CaseStudyModal";
+import OrientationOverlay from "@/components/OrientationOverlay";
 
 export default function PlayClient({ level }: { level: Level }) {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function PlayClient({ level }: { level: Level }) {
 
   return (
     <div className="min-h-screen w-full bg-zinc-950 text-zinc-100">
+      <OrientationOverlay />
       <Game key={level.slug} level={level} onLevelComplete={handleLevelComplete} />
       {modalOpen && (
         <CaseStudyModal
