@@ -19,6 +19,9 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const continueLabel = level.nextLevelSlug ? "Next level →" : "View final screen →";
+  const hasOngoing = level.enemies.some((e) => e.isCurrentBattle);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm sm:items-center"
@@ -65,6 +68,34 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
           ))}
         </div>
 
+        {hasOngoing && (
+          <p className="mt-4 text-sm italic text-zinc-300">
+            Some problems aren&apos;t solved yet. That&apos;s where you come in.
+          </p>
+        )}
+
+        <div className="mt-6 border-t border-zinc-800 pt-5">
+          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">
+            Bosses
+          </h3>
+          <ul className="space-y-2">
+            {level.enemies.map((e) => (
+              <li
+                key={e.id}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm"
+              >
+                <span className="font-semibold text-zinc-100">{e.label}</span>
+                <span className="text-zinc-400">— {e.solution}</span>
+                {e.isCurrentBattle && (
+                  <span className="rounded-full border border-red-500/60 bg-red-500/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-red-300">
+                    Still Fighting
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -78,7 +109,7 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
             onClick={onContinue}
             className="rounded-md bg-white px-4 py-2 text-sm font-bold text-zinc-900 transition hover:bg-zinc-100"
           >
-            Continue →
+            {continueLabel}
           </button>
         </div>
       </div>

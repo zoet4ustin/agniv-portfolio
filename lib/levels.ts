@@ -2,6 +2,17 @@ export type Enemy = {
   id: string;
   label: string;
   solution: string;
+  isCurrentBattle?: boolean;
+};
+
+export type Platform = { x: number; y: number; width: number };
+
+export type EnemyPlacement = {
+  enemyId: string;
+  x: number;
+  y: number;
+  patrolMin: number;
+  patrolMax: number;
 };
 
 export type Level = {
@@ -18,7 +29,21 @@ export type Level = {
     metrics: string[];
   };
   isCurrentlyPlaying?: boolean;
+  playerStart: { x: number; y: number };
+  worldWidth: number;
+  platforms: Platform[];
+  enemyPlacements: EnemyPlacement[];
+  flagPosition: { x: number; y: number };
+  skyColor: string;
+  groundColor: string;
+  nextLevelSlug?: string;
 };
+
+const GROUND_Y = 400;
+const ENEMY_H = 28;
+const PLAYER_H = 40;
+const onGround = GROUND_Y - ENEMY_H;
+const playerOnGround = GROUND_Y - PLAYER_H;
 
 export const levels: Level[] = [
   {
@@ -26,6 +51,16 @@ export const levels: Level[] = [
     company: "Flipkart",
     locationName: "Flipkart Castle",
     theme: "#1F3A5F",
+    skyColor: "#87CEEB",
+    groundColor: "#5fb850",
+    playerStart: { x: 80, y: playerOnGround },
+    worldWidth: 2400,
+    platforms: [
+      { x: 600, y: 300, width: 200 },
+      { x: 1200, y: 240, width: 200 },
+    ],
+    flagPosition: { x: 2300, y: GROUND_Y },
+    nextLevelSlug: "jupiter",
     enemies: [
       {
         id: "fake-reviews",
@@ -41,6 +76,29 @@ export const levels: Level[] = [
         id: "payment-fraud",
         label: "Payment fraud patterns",
         solution: "ML risk model + third-party intelligence APIs cut fraud incidents materially",
+      },
+    ],
+    enemyPlacements: [
+      {
+        enemyId: "fake-reviews",
+        x: 400,
+        y: onGround,
+        patrolMin: 400,
+        patrolMax: 500 - ENEMY_H,
+      },
+      {
+        enemyId: "counterfeit-sellers",
+        x: 620,
+        y: 300 - ENEMY_H,
+        patrolMin: 600,
+        patrolMax: 800 - ENEMY_H,
+      },
+      {
+        enemyId: "payment-fraud",
+        x: 1500,
+        y: onGround,
+        patrolMin: 1500,
+        patrolMax: 1700 - ENEMY_H,
       },
     ],
     caseStudy: {
@@ -63,6 +121,17 @@ export const levels: Level[] = [
     company: "Jupiter Money",
     locationName: "Jupiter Money Tower",
     theme: "#4F46E5",
+    skyColor: "#2D1B69",
+    groundColor: "#1E1B4B",
+    playerStart: { x: 80, y: 360 },
+    worldWidth: 2400,
+    platforms: [
+      { x: 500, y: 320, width: 180 },
+      { x: 900, y: 260, width: 160 },
+      { x: 1400, y: 300, width: 200 },
+    ],
+    flagPosition: { x: 2300, y: GROUND_Y },
+    nextLevelSlug: "rozana",
     enemies: [
       {
         id: "long-onboarding",
@@ -78,6 +147,29 @@ export const levels: Level[] = [
         id: "rbi-compliance",
         label: "RBI compliance gaps",
         solution: "Embedded KYC/AML rules in transaction path",
+      },
+    ],
+    enemyPlacements: [
+      {
+        enemyId: "long-onboarding",
+        x: 300,
+        y: onGround,
+        patrolMin: 300,
+        patrolMax: 450 - ENEMY_H,
+      },
+      {
+        enemyId: "conversion-ceiling",
+        x: 920,
+        y: 260 - ENEMY_H,
+        patrolMin: 920,
+        patrolMax: 1040 - ENEMY_H,
+      },
+      {
+        enemyId: "rbi-compliance",
+        x: 1700,
+        y: onGround,
+        patrolMin: 1700,
+        patrolMax: 1900 - ENEMY_H,
       },
     ],
     caseStudy: {
@@ -101,6 +193,17 @@ export const levels: Level[] = [
     company: "Rozana",
     locationName: "Rozana Village",
     theme: "#16A34A",
+    skyColor: "#FED7AA",
+    groundColor: "#15803D",
+    playerStart: { x: 80, y: 360 },
+    worldWidth: 2400,
+    platforms: [
+      { x: 400, y: 310, width: 200 },
+      { x: 800, y: 270, width: 180 },
+      { x: 1300, y: 320, width: 220 },
+    ],
+    flagPosition: { x: 2300, y: GROUND_Y },
+    nextLevelSlug: "cars24",
     enemies: [
       {
         id: "catalog-dropoffs",
@@ -116,6 +219,29 @@ export const levels: Level[] = [
         id: "support-overload",
         label: "Support overload",
         solution: "AI helpdesk with semantic chunking, 28% resolution time cut",
+      },
+    ],
+    enemyPlacements: [
+      {
+        enemyId: "catalog-dropoffs",
+        x: 420,
+        y: 310 - ENEMY_H,
+        patrolMin: 400,
+        patrolMax: 600 - ENEMY_H,
+      },
+      {
+        enemyId: "indian-language-search",
+        x: 820,
+        y: 270 - ENEMY_H,
+        patrolMin: 800,
+        patrolMax: 980 - ENEMY_H,
+      },
+      {
+        enemyId: "support-overload",
+        x: 1620,
+        y: onGround,
+        patrolMin: 1600,
+        patrolMax: 1850 - ENEMY_H,
       },
     ],
     caseStudy: {
@@ -139,7 +265,18 @@ export const levels: Level[] = [
     company: "Cars24",
     locationName: "Cars24 City",
     theme: "#DC2626",
+    skyColor: "#7C2D12",
+    groundColor: "#1F2937",
     isCurrentlyPlaying: true,
+    playerStart: { x: 80, y: 360 },
+    worldWidth: 2800,
+    platforms: [
+      { x: 400, y: 320, width: 180 },
+      { x: 800, y: 260, width: 160 },
+      { x: 1300, y: 290, width: 200 },
+      { x: 1800, y: 240, width: 180 },
+    ],
+    flagPosition: { x: 2700, y: GROUND_Y },
     enemies: [
       {
         id: "created-to-pay",
@@ -155,6 +292,47 @@ export const levels: Level[] = [
         id: "cold-cohorts",
         label: "Cold marketing cohorts",
         solution: "Behavioral lead scoring, +25% U2L",
+      },
+      {
+        id: "dau-mau-stickiness",
+        label: "DAU/MAU stickiness",
+        solution: "Currently fighting — DAU/MAU climbing in real-time",
+        isCurrentBattle: true,
+      },
+    ],
+    enemyPlacements: [
+      {
+        enemyId: "created-to-pay",
+        x: 420,
+        y: 320 - ENEMY_H,
+        patrolMin: 400,
+        patrolMax: 580 - ENEMY_H,
+      },
+      {
+        enemyId: "vendor-crm-cost",
+        x: 920,
+        y: onGround,
+        patrolMin: 900,
+        patrolMax: 1100 - ENEMY_H,
+      },
+      {
+        enemyId: "cold-cohorts",
+        x: 1320,
+        y: 290 - ENEMY_H,
+        patrolMin: 1300,
+        patrolMax: 1500 - ENEMY_H,
+      },
+      {
+        // Placed on the ground between Platform 4 and the flag so the player
+        // must clear it to win. Patrol range leaves enough clear approach
+        // (~250px from Platform 4 end at x=1980) and landing room before the
+        // flag at x=2700, but it's narrow enough that the bounce/jump timing
+        // matters.
+        enemyId: "dau-mau-stickiness",
+        x: 2300,
+        y: onGround,
+        patrolMin: 2250,
+        patrolMax: 2450 - ENEMY_H,
       },
     ],
     caseStudy: {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getLevel, type Level } from "@/lib/levels";
+import { getLevel } from "@/lib/levels";
 import PlayClient from "./PlayClient";
 
 const KNOWN_BONUS = new Set(["skills", "contact"]);
@@ -12,12 +12,8 @@ export default async function PlayLevelPage({
   const { level: slug } = await params;
   const level = getLevel(slug);
 
-  if (level && level.slug === "flipkart") {
-    return <PlayClient level={level} />;
-  }
-
   if (level) {
-    return <ComingSoon level={level} />;
+    return <PlayClient level={level} />;
   }
 
   if (KNOWN_BONUS.has(slug)) {
@@ -33,11 +29,7 @@ export default async function PlayLevelPage({
   return <NotFound slug={slug} />;
 }
 
-function PageShell({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative min-h-screen w-full bg-zinc-950 text-zinc-100">
       <div
@@ -53,31 +45,6 @@ function PageShell({
         {children}
       </main>
     </div>
-  );
-}
-
-function ComingSoon({ level }: { level: Level }) {
-  return (
-    <PageShell>
-      <div
-        className="mb-8 h-32 w-full max-w-md rounded-lg border border-black/30"
-        style={{ background: level.theme }}
-        aria-hidden
-      />
-      <p className="mb-3 font-mono text-xs uppercase tracking-[0.4em] text-zinc-500">
-        Loading Level
-      </p>
-      <h1 className="mb-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
-        Level: {level.locationName}
-      </h1>
-      <p className="mb-10 font-mono text-sm text-zinc-400">coming soon</p>
-      <Link
-        href="/"
-        className="rounded-md border border-zinc-700 bg-zinc-900/80 px-4 py-2 font-mono text-xs uppercase tracking-widest text-zinc-300 transition hover:border-zinc-500 hover:text-white"
-      >
-        ← Back to World Map
-      </Link>
-    </PageShell>
   );
 }
 

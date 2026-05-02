@@ -12,11 +12,17 @@ export default function PlayClient({ level }: { level: Level }) {
 
   const handleLevelComplete = useCallback(() => setModalOpen(true), []);
   const handleClose = useCallback(() => router.push("/"), [router]);
-  const handleContinue = useCallback(() => router.push("/"), [router]);
+  const handleContinue = useCallback(() => {
+    if (level.nextLevelSlug) {
+      router.push(`/play/${level.nextLevelSlug}`);
+    } else {
+      router.push("/end");
+    }
+  }, [router, level.nextLevelSlug]);
 
   return (
     <div className="min-h-screen w-full bg-zinc-950 text-zinc-100">
-      <Game level={level} onLevelComplete={handleLevelComplete} />
+      <Game key={level.slug} level={level} onLevelComplete={handleLevelComplete} />
       {modalOpen && (
         <CaseStudyModal
           level={level}

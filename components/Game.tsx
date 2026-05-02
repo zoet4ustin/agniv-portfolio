@@ -12,8 +12,8 @@ type Props = {
 
 const CANVAS_W = 960;
 const CANVAS_H = 480;
-const WORLD_W = 2400;
 const GROUND_Y = 400;
+const PLATFORM_H = 16;
 const PLAYER_W = 32;
 const PLAYER_H = 40;
 const ENEMY_W = 28;
@@ -25,17 +25,13 @@ const MOVE_SPEED = 3.5;
 const FRICTION = 0.7;
 const MAX_FALL = 14;
 
-const FLAG_X = WORLD_W - 80;
-
-const SPAWN = { x: 80, y: GROUND_Y - PLAYER_H };
-
 const TICK_MS = 1000 / 60;
 
-type Platform = { x: number; y: number; w: number; h: number };
 type EnemyState = {
   id: string;
   label: string;
   solution: string;
+  isCurrentBattle: boolean;
   x: number;
   y: number;
   vx: number;
@@ -44,28 +40,27 @@ type EnemyState = {
   alive: boolean;
 };
 
-const PLATFORMS: Platform[] = [
-  { x: 600, y: 300, w: 200, h: 16 },
-  { x: 1200, y: 240, w: 200, h: 16 },
-];
-
 function buildEnemies(level: Level): EnemyState[] {
-  const positions = [
-    { x: 400, y: GROUND_Y - ENEMY_H, min: 400, max: 500 - ENEMY_W },
-    { x: 620, y: 300 - ENEMY_H, min: 600, max: 800 - ENEMY_W },
-    { x: 1500, y: GROUND_Y - ENEMY_H, min: 1500, max: 1700 - ENEMY_W },
-  ];
-  return level.enemies.slice(0, 3).map((e, i) => ({
-    id: e.id,
-    label: e.label,
-    solution: e.solution,
-    x: positions[i].x,
-    y: positions[i].y,
-    vx: 1,
-    minX: positions[i].min,
-    maxX: positions[i].max,
-    alive: true,
-  }));
+  return level.enemyPlacements.map((p) => {
+    const e = level.enemies.find((en) => en.id === p.enemyId);
+    if (!e) {
+      throw new Error(
+        `Enemy "${p.enemyId}" referenced in placements not found in level "${level.slug}"`
+      );
+    }
+    return {
+      id: e.id,
+      label: e.label,
+      solution: e.solution,
+      isCurrentBattle: e.isCurrentBattle ?? false,
+      x: p.x,
+      y: p.y,
+      vx: 1,
+      minX: p.patrolMin,
+      maxX: p.patrolMax,
+      alive: true,
+    };
+  });
 }
 
 type Keys = {
@@ -100,8 +95,8 @@ export default function Game({ level, onLevelComplete }: Props) {
     jumpQueued: false,
   });
   const stateRef = useRef<State>({
-    px: SPAWN.x,
-    py: SPAWN.y,
+    px: level.playerStart.x,
+    py: level.playerStart.y,
     vx: 0,
     vy: 0,
     onGround: true,
@@ -117,7 +112,6 @@ export default function Game({ level, onLevelComplete }: Props) {
     onCompleteRef.current = onLevelComplete;
   }, [onLevelComplete]);
 
-  // Touch detection
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(pointer: coarse)");
@@ -127,7 +121,6 @@ export default function Game({ level, onLevelComplete }: Props) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // Keyboard
   useEffect(() => {
     const isJumpKey = (k: string) =>
       k === "ArrowUp" || k === "w" || k === "W" || k === " " || k === "Spacebar";
@@ -161,15 +154,6 @@ export default function Game({ level, onLevelComplete }: Props) {
     };
   }, []);
 
-  const respawn = useCallback(() => {
-    const s = stateRef.current;
-    s.px = SPAWN.x;
-    s.py = SPAWN.y;
-    s.vx = 0;
-    s.vy = 0;
-    s.cameraX = 0;
-  }, []);
-
   const showToast = useCallback((text: string) => {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
@@ -192,12 +176,29 @@ export default function Game({ level, onLevelComplete }: Props) {
     }, 3000);
   }, []);
 
-  // Game loop
+  // Game loop — re-runs when level changes (Game is also keyed on slug in PlayClient)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    const platforms = level.platforms;
+    const worldWidth = level.worldWidth;
+    const flagX = level.flagPosition.x;
+    const flagY = level.flagPosition.y;
+    const sky = level.skyColor;
+    const ground = level.groundColor;
+    const groundDark = darken(ground, 0.25);
+
+    const respawn = () => {
+      const s = stateRef.current;
+      s.px = level.playerStart.x;
+      s.py = level.playerStart.y;
+      s.vx = 0;
+      s.vy = 0;
+      s.cameraX = 0;
+    };
 
     let raf = 0;
     let last = performance.now();
@@ -206,7 +207,6 @@ export default function Game({ level, onLevelComplete }: Props) {
     const physicsStep = () => {
       const s = stateRef.current;
       const k = keysRef.current;
-
       if (s.completed) return;
 
       // Horizontal input
@@ -232,8 +232,8 @@ export default function Game({ level, onLevelComplete }: Props) {
         s.px = 0;
         s.vx = 0;
       }
-      if (s.px + PLAYER_W > WORLD_W) {
-        s.px = WORLD_W - PLAYER_W;
+      if (s.px + PLAYER_W > worldWidth) {
+        s.px = worldWidth - PLAYER_W;
         s.vx = 0;
       }
 
@@ -250,8 +250,8 @@ export default function Game({ level, onLevelComplete }: Props) {
       }
 
       // Platform collisions (top-only)
-      for (const p of PLATFORMS) {
-        const overlapsX = s.px + PLAYER_W > p.x && s.px < p.x + p.w;
+      for (const p of platforms) {
+        const overlapsX = s.px + PLAYER_W > p.x && s.px < p.x + p.width;
         const enteringTop = prevBottom <= p.y && s.py + PLAYER_H >= p.y;
         if (overlapsX && enteringTop && s.vy >= 0) {
           s.py = p.y - PLAYER_H;
@@ -282,10 +282,18 @@ export default function Game({ level, onLevelComplete }: Props) {
 
         const playerBottom = s.py + PLAYER_H;
         if (s.vy > 0 && playerBottom - e.y < 18) {
-          e.alive = false;
-          s.vy = JUMP_V * 0.6;
-          setSolutions((c) => c + 1);
-          showToast(e.solution);
+          if (e.isCurrentBattle) {
+            // Indestructible: bounce the player but keep the enemy alive.
+            // Snap to the enemy's top so the bounce starts cleanly.
+            s.py = e.y - PLAYER_H;
+            s.vy = JUMP_V * 0.6;
+            s.onGround = false;
+          } else {
+            e.alive = false;
+            s.vy = JUMP_V * 0.6;
+            setSolutions((c) => c + 1);
+            showToast(e.solution);
+          }
         } else {
           respawn();
           break;
@@ -293,11 +301,15 @@ export default function Game({ level, onLevelComplete }: Props) {
       }
 
       // Camera lerp toward player center
-      const target = clamp(s.px - CANVAS_W / 2 + PLAYER_W / 2, 0, WORLD_W - CANVAS_W);
+      const target = clamp(
+        s.px - CANVAS_W / 2 + PLAYER_W / 2,
+        0,
+        Math.max(0, worldWidth - CANVAS_W)
+      );
       s.cameraX += (target - s.cameraX) * 0.1;
 
       // Flag
-      if (!s.completed && s.px >= FLAG_X) {
+      if (!s.completed && s.px >= flagX) {
         s.completed = true;
         onCompleteRef.current();
       }
@@ -305,14 +317,19 @@ export default function Game({ level, onLevelComplete }: Props) {
 
     const render = () => {
       const s = stateRef.current;
+
       // Sky
-      ctx.fillStyle = "#87CEEB";
+      ctx.fillStyle = sky;
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-      // Distant clouds (simple decoration, parallax)
-      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      // Wispy parallax clouds — slight transparency reads against any sky
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
       for (let i = 0; i < 5; i++) {
-        const cx = ((i * 600 - s.cameraX * 0.3) % (WORLD_W + 400)) - 200;
+        const cx =
+          ((i * 600 - s.cameraX * 0.3) % (worldWidth + 400) +
+            (worldWidth + 400)) %
+            (worldWidth + 400) -
+          200;
         drawCloud(ctx, cx, 60 + (i % 2) * 28);
       }
 
@@ -320,21 +337,21 @@ export default function Game({ level, onLevelComplete }: Props) {
       ctx.translate(-Math.round(s.cameraX), 0);
 
       // Ground
-      ctx.fillStyle = "#5fb850";
-      ctx.fillRect(0, GROUND_Y, WORLD_W, CANVAS_H - GROUND_Y);
-      ctx.fillStyle = "#3d8c3a";
-      ctx.fillRect(0, GROUND_Y, WORLD_W, 4);
+      ctx.fillStyle = ground;
+      ctx.fillRect(0, GROUND_Y, worldWidth, CANVAS_H - GROUND_Y);
+      ctx.fillStyle = groundDark;
+      ctx.fillRect(0, GROUND_Y, worldWidth, 4);
 
       // Platforms
-      for (const p of PLATFORMS) {
+      for (const p of platforms) {
         ctx.fillStyle = "#8B4513";
-        ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.fillRect(p.x, p.y, p.width, PLATFORM_H);
         ctx.fillStyle = "#6e3710";
-        ctx.fillRect(p.x, p.y, p.w, 3);
+        ctx.fillRect(p.x, p.y, p.width, 3);
       }
 
       // Flag
-      drawFlag(ctx, FLAG_X, GROUND_Y);
+      drawFlag(ctx, flagX, flagY, level.theme);
 
       // Enemies
       for (const e of s.enemies) {
@@ -351,7 +368,7 @@ export default function Game({ level, onLevelComplete }: Props) {
     const loop = (now: number) => {
       const elapsed = now - last;
       last = now;
-      acc += Math.min(elapsed, 100); // cap to avoid spiral of death
+      acc += Math.min(elapsed, 100);
       while (acc >= TICK_MS) {
         physicsStep();
         acc -= TICK_MS;
@@ -366,7 +383,7 @@ export default function Game({ level, onLevelComplete }: Props) {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (toastHideTimerRef.current) clearTimeout(toastHideTimerRef.current);
     };
-  }, [respawn, showToast]);
+  }, [level, showToast]);
 
   const handleMobilePress = useCallback((key: MobileKey, down: boolean) => {
     if (key === "left") keysRef.current.left = down;
@@ -383,7 +400,6 @@ export default function Game({ level, onLevelComplete }: Props) {
         className="relative mx-auto w-full max-w-[960px] overflow-hidden rounded-md border border-zinc-800 shadow-xl"
         style={{ aspectRatio: "2 / 1" }}
       >
-        {/* Theme top bar */}
         <div
           className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1.5"
           style={{ background: level.theme }}
@@ -401,7 +417,6 @@ export default function Game({ level, onLevelComplete }: Props) {
           aria-label={`${level.locationName} game canvas`}
         />
 
-        {/* Top-left HUD */}
         <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col gap-1 sm:left-4 sm:top-4">
           <div className="rounded-md border border-white/15 bg-black/55 px-3 py-1.5 font-mono text-[11px] uppercase tracking-widest text-white shadow backdrop-blur sm:text-xs">
             {level.company}
@@ -411,7 +426,6 @@ export default function Game({ level, onLevelComplete }: Props) {
           </div>
         </div>
 
-        {/* Top-right link */}
         <Link
           href="/resume"
           className="absolute right-3 top-3 z-20 rounded-md border border-white/20 bg-black/55 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-white shadow backdrop-blur transition hover:bg-black/80 sm:right-4 sm:top-4 sm:text-xs"
@@ -419,7 +433,6 @@ export default function Game({ level, onLevelComplete }: Props) {
           Skip the game, see resume →
         </Link>
 
-        {/* Toast */}
         {toast && (
           <div
             role="status"
@@ -440,7 +453,9 @@ export default function Game({ level, onLevelComplete }: Props) {
       </div>
 
       <p className="mx-auto mt-3 max-w-[960px] text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500 sm:text-xs">
-        {isTouch ? "Tap controls below · jump on enemies" : "Arrow keys / A·D to move · ↑ / W / Space to jump"}
+        {isTouch
+          ? "Tap controls below · jump on enemies"
+          : "Arrow keys / A·D to move · ↑ / W / Space to jump"}
       </p>
     </div>
   );
@@ -448,6 +463,18 @@ export default function Game({ level, onLevelComplete }: Props) {
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
+}
+
+function darken(hex: string, factor: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const v = parseInt(m[1], 16);
+  const r = (v >> 16) & 0xff;
+  const g = (v >> 8) & 0xff;
+  const b = v & 0xff;
+  const adj = (c: number) => Math.max(0, Math.round(c * (1 - factor)));
+  const out = (adj(r) << 16) | (adj(g) << 8) | adj(b);
+  return `#${out.toString(16).padStart(6, "0")}`;
 }
 
 function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number) {
@@ -458,27 +485,28 @@ function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.fill();
 }
 
-function drawFlag(ctx: CanvasRenderingContext2D, x: number, groundY: number) {
+function drawFlag(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  groundY: number,
+  flagColor: string
+) {
   const poleH = 140;
   const top = groundY - poleH;
-  // pole
   ctx.fillStyle = "#7a4a1a";
   ctx.fillRect(x, top, 6, poleH);
-  // flag
-  ctx.fillStyle = "#dc2626";
+  ctx.fillStyle = flagColor;
   ctx.beginPath();
   ctx.moveTo(x + 6, top + 6);
   ctx.lineTo(x + 6 + 38, top + 18);
   ctx.lineTo(x + 6, top + 30);
   ctx.closePath();
   ctx.fill();
-  // base
   ctx.fillStyle = "#3d8c3a";
   ctx.fillRect(x - 6, groundY - 4, 18, 4);
 }
 
 function drawEnemy(ctx: CanvasRenderingContext2D, e: EnemyState) {
-  // Label
   ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
   ctx.textAlign = "center";
   const labelY = e.y - 12;
@@ -489,33 +517,31 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: EnemyState) {
   ctx.fillText(e.label, e.x + ENEMY_W / 2, labelY);
   ctx.textAlign = "start";
 
-  // Body
   ctx.fillStyle = "#dc2626";
   ctx.fillRect(e.x, e.y, ENEMY_W, ENEMY_H);
   ctx.fillStyle = "#a31818";
   ctx.fillRect(e.x, e.y + ENEMY_H - 4, ENEMY_W, 4);
-  // Eyes
   ctx.fillStyle = "#fff";
   ctx.fillRect(e.x + 5, e.y + 7, 6, 7);
   ctx.fillRect(e.x + ENEMY_W - 11, e.y + 7, 6, 7);
-  // Pupils — track movement direction
   const pupilOffset = e.vx > 0 ? 3 : e.vx < 0 ? 0 : 1;
   ctx.fillStyle = "#000";
   ctx.fillRect(e.x + 5 + pupilOffset, e.y + 9, 3, 3);
   ctx.fillRect(e.x + ENEMY_W - 11 + pupilOffset, e.y + 9, 3, 3);
 }
 
-function drawPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, vx: number) {
-  // Body
+function drawPlayer(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  vx: number
+) {
   ctx.fillStyle = "#2563eb";
   ctx.fillRect(x, y + 10, PLAYER_W, PLAYER_H - 10);
-  // Belt
   ctx.fillStyle = "#1d3f96";
   ctx.fillRect(x, y + 24, PLAYER_W, 3);
-  // Head
   ctx.fillStyle = "#f3d9b1";
   ctx.fillRect(x + 4, y, PLAYER_W - 8, 14);
-  // Eyes
   const facing = vx >= 0 ? 1 : -1;
   ctx.fillStyle = "#000";
   if (facing > 0) {
@@ -525,8 +551,8 @@ function drawPlayer(ctx: CanvasRenderingContext2D, x: number, y: number, vx: num
     ctx.fillRect(x + 5, y + 5, 3, 3);
     ctx.fillRect(x + 11, y + 5, 3, 3);
   }
-  // Cap
   ctx.fillStyle = "#dc2626";
   ctx.fillRect(x + 2, y - 2, PLAYER_W - 4, 4);
   ctx.fillRect(x + (facing > 0 ? PLAYER_W - 10 : 2), y - 4, 8, 4);
 }
+
