@@ -6,7 +6,7 @@ export default function ResumePage() {
     <div className="min-h-screen w-full bg-zinc-950 text-zinc-100">
       <div className="mx-auto w-full max-w-3xl px-6 py-16">
         <Link
-          href="/"
+          href="/#chapters"
           className="mb-10 inline-block font-mono text-xs uppercase tracking-widest text-zinc-400 transition hover:text-white"
         >
           ← Back to game

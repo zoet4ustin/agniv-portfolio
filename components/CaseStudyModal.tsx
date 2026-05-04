@@ -24,7 +24,7 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -32,71 +32,82 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="case-study-title"
-        className="relative my-6 w-full max-w-2xl rounded-xl border border-zinc-700 bg-zinc-900 p-6 text-zinc-100 shadow-2xl sm:my-8 sm:p-8"
         onClick={(e) => e.stopPropagation()}
-        style={{ borderTopColor: level.theme, borderTopWidth: 4 }}
+        className="relative flex w-[min(640px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-100 shadow-2xl"
+        style={{
+          borderTopColor: level.theme,
+          borderTopWidth: 4,
+          maxHeight: "min(calc(100vh - 32px), calc(100dvh - 32px))",
+        }}
       >
-        <p className="mb-2 font-mono text-xs uppercase tracking-[0.3em] text-zinc-500">
-          Level Cleared · {level.company}
-        </p>
-        <h2
-          id="case-study-title"
-          className="mb-6 text-2xl font-black tracking-tight sm:text-3xl"
-        >
-          {level.caseStudy.title}
-        </h2>
-
-        <div className="space-y-5 text-sm leading-relaxed sm:text-base">
-          <Section label="Problem">{level.caseStudy.problem}</Section>
-          <Section label="Approach">{level.caseStudy.approach}</Section>
-          <Section label="Outcome">{level.caseStudy.outcome}</Section>
-        </div>
-
-        <div className="mt-6 flex flex-wrap gap-2">
-          {level.caseStudy.metrics.map((m) => (
-            <span
-              key={m}
-              className="rounded-full px-3 py-1 text-xs font-semibold"
-              style={{
-                background: `${level.theme}26`,
-                color: level.theme,
-                border: `1px solid ${level.theme}80`,
-              }}
-            >
-              {m}
-            </span>
-          ))}
-        </div>
-
-        {hasOngoing && (
-          <p className="mt-4 text-sm italic text-zinc-300">
-            Some problems aren&apos;t solved yet. That&apos;s where you come in.
+        {/* Sticky header */}
+        <div className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-900 px-6 pb-4 pt-5 sm:px-8 sm:pt-6">
+          <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-500 sm:text-xs">
+            Level Cleared · {level.company}
           </p>
-        )}
-
-        <div className="mt-6 border-t border-zinc-800 pt-5">
-          <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">
-            Bosses
-          </h3>
-          <ul className="space-y-2">
-            {level.enemies.map((e) => (
-              <li
-                key={e.id}
-                className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm"
-              >
-                <span className="font-semibold text-zinc-100">{e.label}</span>
-                <span className="text-zinc-400">— {e.solution}</span>
-                {e.isCurrentBattle && (
-                  <span className="rounded-full border border-red-500/60 bg-red-500/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-red-300">
-                    Still Fighting
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+          <h2
+            id="case-study-title"
+            className="text-xl font-black leading-tight tracking-tight sm:text-2xl"
+          >
+            {level.caseStudy.title}
+          </h2>
         </div>
 
-        <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 sm:px-8 sm:py-6">
+          <div className="space-y-5 text-sm leading-relaxed sm:text-base">
+            <Section label="Problem">{level.caseStudy.problem}</Section>
+            <Section label="Approach">{level.caseStudy.approach}</Section>
+            <Section label="Outcome">{level.caseStudy.outcome}</Section>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {level.caseStudy.metrics.map((m) => (
+              <span
+                key={m}
+                className="rounded-full px-3 py-1 text-xs font-semibold"
+                style={{
+                  background: `${level.theme}26`,
+                  color: level.theme,
+                  border: `1px solid ${level.theme}80`,
+                }}
+              >
+                {m}
+              </span>
+            ))}
+          </div>
+
+          {hasOngoing && (
+            <p className="mt-4 text-sm italic text-zinc-300">
+              Some problems aren&apos;t solved yet. That&apos;s where you come in.
+            </p>
+          )}
+
+          <div className="mt-6 border-t border-zinc-800 pt-5">
+            <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">
+              Bosses
+            </h3>
+            <ul className="space-y-2">
+              {level.enemies.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm"
+                >
+                  <span className="font-semibold text-zinc-100">{e.label}</span>
+                  <span className="text-zinc-400">— {e.solution}</span>
+                  {e.isCurrentBattle && (
+                    <span className="rounded-full border border-red-500/60 bg-red-500/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-red-300">
+                      Still Fighting
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Sticky footer with stacked buttons on narrow screens */}
+        <div className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 border-t border-zinc-800 bg-zinc-900 px-6 py-4 min-[400px]:flex-row min-[400px]:justify-end sm:px-8">
           <button
             type="button"
             onClick={onClose}

@@ -1,8 +1,13 @@
+import type { EnemySpriteKey } from "./assets";
+
 export type Enemy = {
   id: string;
   label: string;
   solution: string;
   isCurrentBattle?: boolean;
+  spriteKey: EnemySpriteKey;
+  // Display size on canvas (px). Boss enemies render larger.
+  spriteSize?: number;
 };
 
 export type Platform = { x: number; y: number; width: number };
@@ -54,53 +59,56 @@ export const levels: Level[] = [
     skyColor: "#87CEEB",
     groundColor: "#5fb850",
     playerStart: { x: 80, y: playerOnGround },
-    worldWidth: 2400,
+    worldWidth: 1800,
     platforms: [
-      // Stepping stone so the player can reach Platform 1 (y=300, has enemy).
-      { x: 440, y: 350, width: 100 },
-      { x: 600, y: 300, width: 200 },
-      { x: 1200, y: 240, width: 200 },
+      // Stepping stone for Platform 1.
+      { x: 320, y: 350, width: 96 },
+      { x: 460, y: 300, width: 160 },
+      { x: 980, y: 240, width: 160 },
     ],
-    flagPosition: { x: 2300, y: GROUND_Y },
+    flagPosition: { x: 1700, y: GROUND_Y },
     nextLevelSlug: "jupiter",
     enemies: [
       {
         id: "fake-reviews",
         label: "Fake reviews",
         solution: "Built rule engine flagging reviewer-velocity anomalies",
+        spriteKey: "mushroom",
       },
       {
         id: "counterfeit-sellers",
         label: "Counterfeit sellers",
         solution: "Seller risk-scoring workflow improved authenticity detection by 15%",
+        spriteKey: "trunk",
       },
       {
         id: "payment-fraud",
         label: "Payment fraud patterns",
         solution: "ML risk model + third-party intelligence APIs cut fraud incidents materially",
+        spriteKey: "snail",
       },
     ],
     enemyPlacements: [
       {
         enemyId: "fake-reviews",
-        x: 400,
+        x: 220,
         y: onGround,
-        patrolMin: 400,
-        patrolMax: 500 - ENEMY_H,
+        patrolMin: 200,
+        patrolMax: 320 - ENEMY_H,
       },
       {
         enemyId: "counterfeit-sellers",
-        x: 620,
+        x: 480,
         y: 300 - ENEMY_H,
-        patrolMin: 600,
-        patrolMax: 800 - ENEMY_H,
+        patrolMin: 460,
+        patrolMax: 620 - ENEMY_H,
       },
       {
         enemyId: "payment-fraud",
-        x: 1500,
+        x: 1200,
         y: onGround,
-        patrolMin: 1500,
-        patrolMax: 1700 - ENEMY_H,
+        patrolMin: 1180,
+        patrolMax: 1380 - ENEMY_H,
       },
     ],
     caseStudy: {
@@ -126,54 +134,57 @@ export const levels: Level[] = [
     skyColor: "#2D1B69",
     groundColor: "#1E1B4B",
     playerStart: { x: 80, y: 360 },
-    worldWidth: 2400,
+    worldWidth: 1800,
     platforms: [
-      { x: 500, y: 320, width: 180 },
-      // Stepping stone so the player can reach Platform 2 (y=260, has enemy).
-      { x: 760, y: 340, width: 100 },
-      { x: 900, y: 260, width: 160 },
-      { x: 1400, y: 300, width: 200 },
+      { x: 380, y: 320, width: 140 },
+      // Stepping stone to reach Platform 2.
+      { x: 580, y: 340, width: 90 },
+      { x: 700, y: 260, width: 140 },
+      { x: 1080, y: 300, width: 160 },
     ],
-    flagPosition: { x: 2300, y: GROUND_Y },
+    flagPosition: { x: 1700, y: GROUND_Y },
     nextLevelSlug: "rozana",
     enemies: [
       {
         id: "long-onboarding",
         label: "25-min onboarding",
         solution: "Re-sequenced flow, integrated PAN/Aadhaar/bureau APIs",
+        spriteKey: "ghost",
       },
       {
         id: "conversion-ceiling",
         label: "5% conversion ceiling",
         solution: "Funnel A/B tests, micro-friction removal",
+        spriteKey: "mushroom",
       },
       {
         id: "rbi-compliance",
         label: "RBI compliance gaps",
         solution: "Embedded KYC/AML rules in transaction path",
+        spriteKey: "trunk",
       },
     ],
     enemyPlacements: [
       {
         enemyId: "long-onboarding",
-        x: 300,
+        x: 220,
         y: onGround,
-        patrolMin: 300,
-        patrolMax: 450 - ENEMY_H,
+        patrolMin: 200,
+        patrolMax: 340 - ENEMY_H,
       },
       {
         enemyId: "conversion-ceiling",
-        x: 920,
+        x: 720,
         y: 260 - ENEMY_H,
-        patrolMin: 920,
-        patrolMax: 1040 - ENEMY_H,
+        patrolMin: 710,
+        patrolMax: 840 - ENEMY_H,
       },
       {
         enemyId: "rbi-compliance",
-        x: 1700,
+        x: 1320,
         y: onGround,
-        patrolMin: 1700,
-        patrolMax: 1900 - ENEMY_H,
+        patrolMin: 1300,
+        patrolMax: 1500 - ENEMY_H,
       },
     ],
     caseStudy: {
@@ -200,56 +211,57 @@ export const levels: Level[] = [
     skyColor: "#FED7AA",
     groundColor: "#15803D",
     playerStart: { x: 80, y: 360 },
-    worldWidth: 2400,
+    worldWidth: 1800,
     platforms: [
-      // Lowered from y=310 to y=320 so it's reachable from the ground in
-      // one jump without needing a stepping stone.
-      { x: 400, y: 320, width: 200 },
-      // Stepping stone so the player can reach Platform 2 (y=270, has enemy).
-      { x: 660, y: 340, width: 100 },
-      { x: 800, y: 270, width: 180 },
-      { x: 1300, y: 320, width: 220 },
+      { x: 280, y: 320, width: 160 },
+      // Stepping stone to reach Platform 2.
+      { x: 500, y: 340, width: 90 },
+      { x: 620, y: 270, width: 140 },
+      { x: 1000, y: 320, width: 180 },
     ],
-    flagPosition: { x: 2300, y: GROUND_Y },
+    flagPosition: { x: 1700, y: GROUND_Y },
     nextLevelSlug: "cars24",
     enemies: [
       {
         id: "catalog-dropoffs",
         label: "Catalog drop-offs",
         solution: "Contextual recommendation engine (seasonality, region, connectivity-aware)",
+        spriteKey: "snail",
       },
       {
         id: "indian-language-search",
         label: "Indian-language search miss",
         solution: "Semantic search + RAG retrieval tuned to local queries",
+        spriteKey: "mushroom",
       },
       {
         id: "support-overload",
         label: "Support overload",
         solution: "AI helpdesk with semantic chunking, 28% resolution time cut",
+        spriteKey: "ghost",
       },
     ],
     enemyPlacements: [
       {
         enemyId: "catalog-dropoffs",
-        x: 420,
+        x: 300,
         y: 320 - ENEMY_H,
-        patrolMin: 400,
-        patrolMax: 600 - ENEMY_H,
+        patrolMin: 280,
+        patrolMax: 440 - ENEMY_H,
       },
       {
         enemyId: "indian-language-search",
-        x: 820,
+        x: 640,
         y: 270 - ENEMY_H,
-        patrolMin: 800,
-        patrolMax: 980 - ENEMY_H,
+        patrolMin: 620,
+        patrolMax: 760 - ENEMY_H,
       },
       {
         enemyId: "support-overload",
-        x: 1620,
+        x: 1240,
         y: onGround,
-        patrolMin: 1600,
-        patrolMax: 1850 - ENEMY_H,
+        patrolMin: 1220,
+        patrolMax: 1420 - ENEMY_H,
       },
     ],
     caseStudy: {
@@ -277,72 +289,76 @@ export const levels: Level[] = [
     groundColor: "#1F2937",
     isCurrentlyPlaying: true,
     playerStart: { x: 80, y: 360 },
-    worldWidth: 2800,
+    worldWidth: 2200,
     platforms: [
-      { x: 400, y: 320, width: 180 },
-      { x: 800, y: 260, width: 160 },
-      // Stepping stone so the player can reach Platform 3 (y=290, has enemy).
-      { x: 1170, y: 350, width: 100 },
-      { x: 1300, y: 290, width: 200 },
-      // Stepping stone so the player can reach Platform 4 (y=240, has the
-      // pass-through DAU/MAU enemy).
-      { x: 1640, y: 320, width: 100 },
-      { x: 1800, y: 240, width: 180 },
+      { x: 300, y: 320, width: 140 },
+      { x: 620, y: 260, width: 130 },
+      // Stepping stone for Platform 3 (cold-cohorts).
+      { x: 880, y: 350, width: 90 },
+      { x: 1000, y: 290, width: 160 },
+      // Stepping stone for Platform 4 (DAU/MAU pass-through boss).
+      { x: 1260, y: 320, width: 90 },
+      { x: 1400, y: 240, width: 160 },
     ],
-    flagPosition: { x: 2700, y: GROUND_Y },
+    flagPosition: { x: 2100, y: GROUND_Y },
     enemies: [
       {
         id: "created-to-pay",
         label: "20% Created-to-Pay funnel",
         solution: "Dynamic bottom sheet + personalization + Lead Mgmt module to 35%",
+        spriteKey: "trunk",
       },
       {
         id: "vendor-crm-cost",
         label: "Vendor CRM costs",
         solution: "AI-built in-house CRM, 2-person hackathon team",
+        spriteKey: "ghost",
       },
       {
         id: "cold-cohorts",
         label: "Cold marketing cohorts",
         solution: "Behavioral lead scoring, +25% U2L",
+        spriteKey: "snail",
       },
       {
         id: "dau-mau-stickiness",
         label: "DAU/MAU stickiness",
         solution: "Currently fighting — DAU/MAU climbing in real-time",
         isCurrentBattle: true,
+        spriteKey: "skullCircle",
+        spriteSize: 48,
       },
     ],
     enemyPlacements: [
       {
         enemyId: "created-to-pay",
-        x: 420,
+        x: 320,
         y: 320 - ENEMY_H,
-        patrolMin: 400,
-        patrolMax: 580 - ENEMY_H,
+        patrolMin: 300,
+        patrolMax: 440 - ENEMY_H,
       },
       {
         enemyId: "vendor-crm-cost",
-        x: 920,
+        x: 720,
         y: onGround,
-        patrolMin: 900,
-        patrolMax: 1100 - ENEMY_H,
+        patrolMin: 700,
+        patrolMax: 860 - ENEMY_H,
       },
       {
         enemyId: "cold-cohorts",
-        x: 1320,
+        x: 1020,
         y: 290 - ENEMY_H,
-        patrolMin: 1300,
-        patrolMax: 1500 - ENEMY_H,
+        patrolMin: 1000,
+        patrolMax: 1160 - ENEMY_H,
       },
       {
+        enemyId: "dau-mau-stickiness",
         // Patrols on Platform 4 — physics treats this enemy as pass-through
         // (see Game.tsx). Visual + STILL FIGHTING badge in the modal only.
-        enemyId: "dau-mau-stickiness",
-        x: 1820,
+        x: 1420,
         y: 240 - ENEMY_H,
-        patrolMin: 1800,
-        patrolMax: 1980 - ENEMY_H,
+        patrolMin: 1400,
+        patrolMax: 1560 - ENEMY_H,
       },
     ],
     caseStudy: {

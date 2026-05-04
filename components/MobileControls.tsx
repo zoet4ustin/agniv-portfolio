@@ -10,8 +10,6 @@ type Props = {
 };
 
 export default function MobileControls({ onPress }: Props) {
-  // Pulse for the first 3s after mount so first-time players notice the
-  // controls. Disabled afterward so it doesn't keep moving while playing.
   const [showPulse, setShowPulse] = useState(true);
   useEffect(() => {
     const t = window.setTimeout(() => setShowPulse(false), 3000);
@@ -35,27 +33,22 @@ export default function MobileControls({ onPress }: Props) {
 
   const baseBtn =
     "grid place-items-center rounded-full border text-white shadow-lg backdrop-blur transition select-none active:scale-95";
+  const dpadBtn =
+    "bg-[rgba(255,255,255,0.10)] border-[rgba(255,255,255,0.30)] active:bg-[rgba(255,255,255,0.25)]";
+  const jumpBtn =
+    "bg-[rgba(245,197,24,0.18)] border-[rgba(245,197,24,0.45)] active:bg-[rgba(245,197,24,0.35)]";
   const pulseClass = showPulse ? "animate-touch-pulse" : "";
-  const dpadStyle = {
-    background: "rgba(255,255,255,0.15)",
-    borderColor: "rgba(255,255,255,0.4)",
-  } as const;
-  const jumpStyle = {
-    background: "rgba(245,197,24,0.2)",
-    borderColor: "rgba(245,197,24,0.55)",
-  } as const;
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex items-end justify-between px-5 sm:bottom-6 sm:px-7"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-end justify-between px-4 pb-4"
       style={{ touchAction: "none" }}
     >
-      <div className="pointer-events-auto flex gap-3">
+      <div className="pointer-events-auto flex gap-2">
         <button
           type="button"
           aria-label="Move left"
-          className={`${baseBtn} ${pulseClass} h-[60px] w-[60px] text-2xl font-bold`}
-          style={dpadStyle}
+          className={`${baseBtn} ${dpadBtn} ${pulseClass} h-14 w-14 text-2xl font-bold`}
           {...bind("left")}
         >
           ←
@@ -63,8 +56,7 @@ export default function MobileControls({ onPress }: Props) {
         <button
           type="button"
           aria-label="Move right"
-          className={`${baseBtn} ${pulseClass} h-[60px] w-[60px] text-2xl font-bold`}
-          style={dpadStyle}
+          className={`${baseBtn} ${dpadBtn} ${pulseClass} h-14 w-14 text-2xl font-bold`}
           {...bind("right")}
         >
           →
@@ -74,8 +66,7 @@ export default function MobileControls({ onPress }: Props) {
         <button
           type="button"
           aria-label="Jump"
-          className={`${baseBtn} ${pulseClass} h-[68px] w-[68px] text-[10px] font-black uppercase tracking-[0.18em]`}
-          style={jumpStyle}
+          className={`${baseBtn} ${jumpBtn} ${pulseClass} h-14 w-14 text-[10px] font-black uppercase tracking-[0.18em]`}
           {...bind("jump")}
         >
           Jump

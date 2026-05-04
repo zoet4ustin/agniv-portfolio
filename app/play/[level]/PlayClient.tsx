@@ -12,7 +12,7 @@ export default function PlayClient({ level }: { level: Level }) {
   const [modalOpen, setModalOpen] = useState(false);
 
   const handleLevelComplete = useCallback(() => setModalOpen(true), []);
-  const handleClose = useCallback(() => router.push("/"), [router]);
+  const handleClose = useCallback(() => router.push("/#chapters"), [router]);
   const handleContinue = useCallback(() => {
     if (level.nextLevelSlug) {
       router.push(`/play/${level.nextLevelSlug}`);

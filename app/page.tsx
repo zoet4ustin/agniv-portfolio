@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect } from "react";
 import { levels } from "@/lib/levels";
 import { contact } from "@/lib/contact";
 
@@ -9,7 +12,67 @@ const TEASERS: Record<string, string> = {
   cars24: "the chapter still being written",
 };
 
+// Per-level brand palette for the chapter cards.
+const CARD_THEME: Record<
+  string,
+  { bg: string; numberColor: string; bodyColor: string; accentBorder?: string }
+> = {
+  flipkart: { bg: "#F8E831", numberColor: "#047BD5", bodyColor: "#047BD5" },
+  jupiter: { bg: "#FC644F", numberColor: "#FFFFFF", bodyColor: "#FFFFFF" },
+  rozana: { bg: "#FFFFFF", numberColor: "#DC2626", bodyColor: "#1A1A1A" },
+  cars24: {
+    bg: "#047BD5",
+    numberColor: "#FFFFFF",
+    bodyColor: "#FFFFFF",
+    accentBorder: "#FF3B30",
+  },
+};
+
+const SECTION_ORDER = ["#hero", "#story", "#chapters"];
+
 export default function Home() {
+  // ENTER / SPACE scrolls forward through the three sections.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable) {
+          return;
+        }
+        // Don't intercept ENTER on links/buttons — they have their own action.
+        if (
+          (tag === "A" || tag === "BUTTON") &&
+          e.key === "Enter"
+        ) {
+          return;
+        }
+      }
+
+      // Find the section currently most-visible in the viewport.
+      const mid = window.innerHeight / 2;
+      let currentIdx = 0;
+      for (let i = 0; i < SECTION_ORDER.length; i++) {
+        const el = document.querySelector(SECTION_ORDER[i]);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= mid) currentIdx = i;
+      }
+      const next = SECTION_ORDER[currentIdx + 1];
+      if (next) {
+        e.preventDefault();
+        document.querySelector(next)?.scrollIntoView({ behavior: "smooth" });
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-zinc-950 text-zinc-100">
       <Link
@@ -53,25 +116,25 @@ function Hero() {
         </p>
 
         <h1 className="mt-10 font-pixel text-3xl leading-[1.4] text-white sm:text-5xl md:text-6xl">
-          FOUR COMPANIES.
+          A PRODUCT CAREER.
         </h1>
         <h2 className="mt-3 font-pixel text-2xl leading-[1.4] text-zinc-300 sm:text-4xl md:text-5xl">
-          REAL PROBLEMS.
+          PLAYED, NOT LISTED.
         </h2>
-        <h3 className="mt-3 font-pixel text-xl leading-[1.4] text-amber-300 sm:text-3xl md:text-4xl">
-          PRESS START.
-        </h3>
 
         <a
           href="#story"
-          className="group mt-12 inline-flex flex-col items-center gap-3"
+          className="group mt-14 inline-flex flex-col items-center gap-3"
           aria-label="Begin"
         >
-          <span className="rounded-sm border border-white/30 bg-white/5 px-6 py-3 font-pixel text-[11px] uppercase tracking-[0.2em] text-white transition group-hover:bg-white group-hover:text-zinc-950 sm:text-xs">
+          <span className="rounded-sm border border-white/30 bg-white/5 px-6 py-3 font-pixel text-xs uppercase tracking-[0.2em] text-amber-300 transition group-hover:border-amber-300 group-hover:bg-amber-300 group-hover:text-zinc-950 animate-press-start sm:text-sm">
             Press Start
           </span>
           <span className="font-pixel text-base text-amber-300 animate-caret" aria-hidden>
             ▼
+          </span>
+          <span className="mt-2 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+            Enter ↵ to begin
           </span>
         </a>
       </div>
@@ -81,10 +144,11 @@ function Hero() {
 
 function Story() {
   const lines = [
-    "Seven years.",
-    "Four companies.",
-    "Dozens of problems shipped against.",
-    "A few still fighting.",
+    "Most resumes lose users between intent and action.",
+    "Mine is a level you can walk through.",
+    "Every problem is real.",
+    "Every solution shipped.",
+    "The last level is still being written.",
   ];
   return (
     <section
@@ -101,8 +165,8 @@ function Story() {
           {lines.map((line, i) => (
             <p
               key={line}
-              className="font-pixel text-base leading-[1.6] text-zinc-100 animate-fade-up sm:text-2xl md:text-3xl"
-              style={{ animationDelay: `${0.1 + i * 0.2}s` }}
+              className="font-pixel text-sm leading-[1.7] text-zinc-100 animate-fade-up sm:text-lg md:text-xl"
+              style={{ animationDelay: `${0.1 + i * 0.18}s` }}
             >
               {line}
             </p>
@@ -110,16 +174,14 @@ function Story() {
         </div>
 
         <p
-          className="mt-12 font-mono text-sm leading-relaxed text-zinc-400 animate-fade-up sm:text-base"
-          style={{ animationDelay: "1.0s" }}
+          className="mt-12 font-mono text-sm text-zinc-400 animate-fade-up sm:text-base"
+          style={{ animationDelay: "1.1s" }}
         >
-          Each level is a real product chapter. Each enemy is a real problem.
-          Each solution is real work.
-          <span className="ml-2 text-zinc-500">— Agniv</span>
+          — Agniv Kashyap
         </p>
 
         <a
-          href="#map"
+          href="#chapters"
           className="mt-14 inline-block rounded-sm border border-white/30 bg-white/5 px-5 py-3 font-pixel text-[10px] uppercase tracking-[0.2em] text-white transition hover:bg-white hover:text-zinc-950 sm:text-xs"
         >
           Begin →
@@ -132,7 +194,7 @@ function Story() {
 function LevelMap() {
   return (
     <section
-      id="map"
+      id="chapters"
       className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden px-6 py-24"
     >
       <PixelGrid />
@@ -151,7 +213,6 @@ function LevelMap() {
               slug={level.slug}
               name={level.locationName}
               company={level.company}
-              theme={level.theme}
               teaser={TEASERS[level.slug] ?? ""}
               isCurrent={level.isCurrentlyPlaying ?? false}
             />
@@ -220,7 +281,6 @@ function LevelCard({
   slug,
   name,
   company,
-  theme,
   teaser,
   isCurrent,
 }: {
@@ -228,46 +288,73 @@ function LevelCard({
   slug: string;
   name: string;
   company: string;
-  theme: string;
   teaser: string;
   isCurrent: boolean;
 }) {
-  const ringStyle = isCurrent
-    ? {
-        boxShadow: `0 0 0 1px ${theme}, 0 0 24px -4px ${theme}aa`,
-        animation: "blink 1.4s steps(1, end) infinite",
-      }
-    : undefined;
+  const palette = CARD_THEME[slug] ?? {
+    bg: "#1F1F1F",
+    numberColor: "#FFFFFF",
+    bodyColor: "#FFFFFF",
+  };
 
   return (
     <Link
       href={`/play/${slug}`}
-      className="group relative flex flex-col overflow-hidden rounded-md border border-zinc-800 bg-zinc-900/60 p-5 transition hover:-translate-y-1 hover:border-zinc-500 hover:bg-zinc-900"
-      style={ringStyle}
+      className="group relative flex flex-col gap-3 overflow-hidden rounded-md p-5 transition hover:-translate-y-1"
+      style={{
+        background: palette.bg,
+        boxShadow: isCurrent
+          ? `0 0 0 2px ${palette.accentBorder ?? "#FF3B30"}, 0 0 24px -4px ${
+              palette.accentBorder ?? "#FF3B30"
+            }aa`
+          : "0 0 0 1px rgba(0,0,0,0.15)",
+        animation: isCurrent ? "blinkFast 1.8s steps(1, end) infinite" : undefined,
+      }}
     >
       <div
-        className="mb-4 grid h-24 w-full place-items-center rounded-sm border border-black/30 font-pixel text-3xl text-white/85"
-        style={{ background: theme }}
-        aria-hidden
+        className="font-pixel text-xs leading-none"
+        style={{ color: palette.numberColor }}
       >
         {String(index + 1).padStart(2, "0")}
       </div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+      <div
+        className="font-mono text-[10px] uppercase tracking-[0.3em] opacity-70"
+        style={{ color: palette.bodyColor }}
+      >
         Chapter {index + 1}
       </div>
-      <div className="mt-1 font-pixel text-base leading-[1.4] text-white sm:text-lg">
+      <div
+        className="font-pixel text-sm leading-[1.4] sm:text-base"
+        style={{ color: palette.bodyColor }}
+      >
         {name}
       </div>
-      <div className="mt-1 font-mono text-xs text-zinc-400">{company}</div>
-      <div className="mt-3 font-mono text-[12px] leading-snug text-zinc-300">
+      <div
+        className="font-mono text-xs opacity-80"
+        style={{ color: palette.bodyColor }}
+      >
+        {company}
+      </div>
+      <div
+        className="font-mono text-[12px] leading-snug"
+        style={{ color: palette.bodyColor }}
+      >
         {teaser}
       </div>
 
       {isCurrent && (
         <span
-          className="mt-3 inline-flex w-fit items-center gap-1.5 rounded-sm border border-red-500/60 bg-red-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-red-300"
+          className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-sm px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest"
+          style={{
+            background: "rgba(0,0,0,0.18)",
+            color: palette.bodyColor,
+            border: `1px solid ${palette.accentBorder ?? "rgba(255,255,255,0.4)"}`,
+          }}
         >
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+          <span
+            className="h-1.5 w-1.5 rounded-full"
+            style={{ background: palette.accentBorder ?? "#FF3B30" }}
+          />
           Now Playing
         </span>
       )}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Level } from "@/lib/levels";
-import { ASSETS } from "@/lib/assets";
+import { ASSETS, type EnemySpriteKey } from "@/lib/assets";
 import { AnimatedSprite, StaticImage } from "@/lib/sprite";
 import MobileControls, { type MobileKey } from "./MobileControls";
 
@@ -16,7 +16,6 @@ const CANVAS_W = 960;
 const CANVAS_H = 480;
 const GROUND_Y = 400;
 const TILE = 16;
-const PLATFORM_H = 16;
 const PLAYER_W = 32;
 const PLAYER_H = 40;
 const ENEMY_W = 28;
@@ -30,12 +29,18 @@ const MAX_FALL = 14;
 
 const TICK_MS = 1000 / 60;
 const TOAST_MS = 4000;
+const INVINCIBLE_MS = 1500;
+const TUTORIAL_RANGE = 200;
+const TUTORIAL_DURATION_MS = 4000;
+const MOBILE_VERTICAL_SHIFT = 40; // shift world up on mobile so action sits above touch buttons
 
 type EnemyState = {
   id: string;
   label: string;
   solution: string;
   isCurrentBattle: boolean;
+  spriteKey: EnemySpriteKey;
+  spriteSize: number;
   x: number;
   y: number;
   vx: number;
@@ -59,6 +64,8 @@ function buildEnemies(level: Level): EnemyState[] {
       label: e.label,
       solution: e.solution,
       isCurrentBattle: e.isCurrentBattle ?? false,
+      spriteKey: e.spriteKey,
+      spriteSize: e.spriteSize ?? 32,
       x: p.x,
       y: p.y,
       vx: 1,
@@ -85,9 +92,18 @@ type State = {
   cameraX: number;
   enemies: EnemyState[];
   completed: boolean;
+  invincibleMs: number;
 };
 
 type PlayerAnim = "idle" | "run" | "jump" | "fall";
+
+type TutorialState = {
+  enemyId: string | null;
+  shownAt: number;
+  dismissed: boolean;
+};
+
+const TUTORIAL_LS_KEY = "tutorialShown";
 
 export default function Game({ level, onLevelComplete }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -111,8 +127,15 @@ export default function Game({ level, onLevelComplete }: Props) {
     cameraX: 0,
     enemies: buildEnemies(level),
     completed: false,
+    invincibleMs: 0,
   });
   const facingRef = useRef<1 | -1>(1);
+  const isTouchRef = useRef(false);
+  const tutorialRef = useRef<TutorialState>({
+    enemyId: null,
+    shownAt: 0,
+    dismissed: true,
+  });
   const toastTimerRef = useRef<number | null>(null);
   const toastHideTimerRef = useRef<number | null>(null);
   const onCompleteRef = useRef(onLevelComplete);
@@ -121,11 +144,26 @@ export default function Game({ level, onLevelComplete }: Props) {
     onCompleteRef.current = onLevelComplete;
   }, [onLevelComplete]);
 
+  // Keep tutorial state in sync with localStorage and level change.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (level.slug !== "flipkart") {
+      tutorialRef.current = { enemyId: null, shownAt: 0, dismissed: true };
+      return;
+    }
+    const seen = window.localStorage.getItem(TUTORIAL_LS_KEY) === "true";
+    tutorialRef.current = { enemyId: null, shownAt: 0, dismissed: seen };
+  }, [level.slug]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mq = window.matchMedia("(pointer: coarse)");
-    setIsTouch(mq.matches);
-    const onChange = (e: MediaQueryListEvent) => setIsTouch(e.matches);
+    const sync = () => {
+      setIsTouch(mq.matches);
+      isTouchRef.current = mq.matches;
+    };
+    sync();
+    const onChange = () => sync();
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
@@ -165,14 +203,10 @@ export default function Game({ level, onLevelComplete }: Props) {
   }, []);
 
   const showToast = useCallback((payload: ToastPayload) => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-    if (toastHideTimerRef.current) {
-      clearTimeout(toastHideTimerRef.current);
-      toastHideTimerRef.current = null;
-    }
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    if (toastHideTimerRef.current) clearTimeout(toastHideTimerRef.current);
+    toastTimerRef.current = null;
+    toastHideTimerRef.current = null;
     setToast(payload);
     setToastShown(false);
     requestAnimationFrame(() => {
@@ -186,14 +220,13 @@ export default function Game({ level, onLevelComplete }: Props) {
     }, TOAST_MS);
   }, []);
 
-  // Game loop — re-runs when level changes (Game is also keyed on slug in PlayClient)
+  // Game loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Sprites — load once per mount.
     const sprites: Record<PlayerAnim, AnimatedSprite> = {
       idle: new AnimatedSprite(ASSETS.player.idle),
       run: new AnimatedSprite(ASSETS.player.run),
@@ -202,6 +235,7 @@ export default function Game({ level, onLevelComplete }: Props) {
     };
     const terrainAtlas = new StaticImage(ASSETS.terrain.src);
     const flagSprite = new StaticImage(ASSETS.flag.idle);
+    const enemyAtlas = new StaticImage(ASSETS.enemySheet.src);
 
     const platforms = level.platforms;
     const worldWidth = level.worldWidth;
@@ -211,18 +245,10 @@ export default function Game({ level, onLevelComplete }: Props) {
     const ground = level.groundColor;
     const groundDark = darken(ground, 0.25);
 
-    // Pre-compute ground tile layout (col grid).
     const groundCols = Math.ceil(worldWidth / TILE);
-    const groundRows = Math.ceil((CANVAS_H - GROUND_Y) / TILE);
-
-    const respawn = () => {
-      const s = stateRef.current;
-      s.px = level.playerStart.x;
-      s.py = level.playerStart.y;
-      s.vx = 0;
-      s.vy = 0;
-      s.cameraX = 0;
-    };
+    // Render extra dirt rows so the mobile -40 vertical shift doesn't expose
+    // raw sky underneath the ground.
+    const groundRows = Math.ceil((CANVAS_H + MOBILE_VERTICAL_SHIFT - GROUND_Y) / TILE);
 
     let raf = 0;
     let last = performance.now();
@@ -232,6 +258,10 @@ export default function Game({ level, onLevelComplete }: Props) {
       const s = stateRef.current;
       const k = keysRef.current;
       if (s.completed) return;
+
+      if (s.invincibleMs > 0) {
+        s.invincibleMs = Math.max(0, s.invincibleMs - TICK_MS);
+      }
 
       if (k.left && !k.right) s.vx = -MOVE_SPEED;
       else if (k.right && !k.left) s.vx = MOVE_SPEED;
@@ -293,6 +323,7 @@ export default function Game({ level, onLevelComplete }: Props) {
         }
 
         if (e.isCurrentBattle) continue;
+        if (s.invincibleMs > 0) continue;
 
         const overlap =
           s.px + PLAYER_W > e.x &&
@@ -307,9 +338,49 @@ export default function Game({ level, onLevelComplete }: Props) {
           s.vy = JUMP_V * 0.6;
           setSolutions((c) => c + 1);
           showToast({ problem: e.label, solution: e.solution });
+          if (level.slug === "flipkart" && !tutorialRef.current.dismissed) {
+            tutorialRef.current.dismissed = true;
+            tutorialRef.current.enemyId = null;
+            try {
+              window.localStorage.setItem(TUTORIAL_LS_KEY, "true");
+            } catch {
+              // ignore — incognito or storage disabled
+            }
+          }
         } else {
-          respawn();
+          // Respawn at point of death — keep position, briefly invincible.
+          s.vx = 0;
+          s.vy = 0;
+          s.invincibleMs = INVINCIBLE_MS;
           break;
+        }
+      }
+
+      // Tutorial trigger (Flipkart only).
+      if (
+        level.slug === "flipkart" &&
+        !tutorialRef.current.dismissed &&
+        !tutorialRef.current.enemyId
+      ) {
+        for (const e of s.enemies) {
+          if (!e.alive) continue;
+          if (Math.abs(s.px - e.x) < TUTORIAL_RANGE) {
+            tutorialRef.current.enemyId = e.id;
+            tutorialRef.current.shownAt = performance.now();
+            break;
+          }
+        }
+      }
+      if (tutorialRef.current.enemyId) {
+        const elapsed = performance.now() - tutorialRef.current.shownAt;
+        if (elapsed > TUTORIAL_DURATION_MS) {
+          tutorialRef.current.enemyId = null;
+          tutorialRef.current.dismissed = true;
+          try {
+            window.localStorage.setItem(TUTORIAL_LS_KEY, "true");
+          } catch {
+            // ignore
+          }
         }
       }
 
@@ -335,10 +406,11 @@ export default function Game({ level, onLevelComplete }: Props) {
       const s = stateRef.current;
       ctx.imageSmoothingEnabled = false;
 
+      // Sky fill (full canvas — never shifted).
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-      // Parallax wisp clouds.
+      // Parallax wisp clouds (also unshifted — stay in upper background).
       ctx.fillStyle = "rgba(255,255,255,0.35)";
       for (let i = 0; i < 5; i++) {
         const cx =
@@ -349,11 +421,13 @@ export default function Game({ level, onLevelComplete }: Props) {
         drawCloud(ctx, cx, 60 + (i % 2) * 28);
       }
 
-      ctx.save();
-      ctx.translate(-Math.round(s.cameraX), 0);
+      // Mobile: shift world up 40px so action sits above touch buttons.
+      const verticalShift = isTouchRef.current ? -MOBILE_VERTICAL_SHIFT : 0;
 
-      // Ground — tile if atlas loaded, else fill rect (so the level still
-      // renders before the texture finishes loading).
+      ctx.save();
+      ctx.translate(-Math.round(s.cameraX), verticalShift);
+
+      // Ground tiles.
       const atlasImg = terrainAtlas.image;
       if (atlasImg) {
         const gt = ASSETS.terrain.tiles.grassTop;
@@ -381,12 +455,12 @@ export default function Game({ level, onLevelComplete }: Props) {
         }
       } else {
         ctx.fillStyle = ground;
-        ctx.fillRect(0, GROUND_Y, worldWidth, CANVAS_H - GROUND_Y);
+        ctx.fillRect(0, GROUND_Y, worldWidth, CANVAS_H + 40 - GROUND_Y);
         ctx.fillStyle = groundDark;
         ctx.fillRect(0, GROUND_Y, worldWidth, 4);
       }
 
-      // Platforms — tile if atlas loaded, else solid block.
+      // Floating platforms.
       for (const p of platforms) {
         if (atlasImg) {
           const pt = ASSETS.terrain.tiles.platform;
@@ -406,13 +480,11 @@ export default function Game({ level, onLevelComplete }: Props) {
           }
         } else {
           ctx.fillStyle = "#8B4513";
-          ctx.fillRect(p.x, p.y, p.width, PLATFORM_H);
-          ctx.fillStyle = "#6e3710";
-          ctx.fillRect(p.x, p.y, p.width, 3);
+          ctx.fillRect(p.x, p.y, p.width, TILE);
         }
       }
 
-      // Flag — End (Idle) sprite if loaded, else stylized fallback.
+      // Flag.
       const flagImg = flagSprite.image;
       if (flagImg) {
         const fSize = ASSETS.flag.size;
@@ -421,18 +493,29 @@ export default function Game({ level, onLevelComplete }: Props) {
         drawFlagFallback(ctx, flagX, flagY, level.theme);
       }
 
-      // Enemies — pixel-styled rectangles. (Pack ships no enemy spritesheets;
-      // see lib/assets.ts and the README note.)
+      // Enemies (sprites from 20 Enemies.png crops, with rectangle fallback).
       for (const e of s.enemies) {
         if (!e.alive) continue;
-        drawEnemy(ctx, e);
+        drawEnemy(ctx, e, enemyAtlas.image);
       }
 
-      // Player — animated sprite. Update + draw the active anim.
+      // Tutorial hint above the chosen enemy.
+      if (tutorialRef.current.enemyId) {
+        const e = s.enemies.find((en) => en.id === tutorialRef.current.enemyId && en.alive);
+        if (e) drawTutorialHint(ctx, e.x + ENEMY_W / 2, e.y - 38);
+      }
+
+      // Player sprite. Blink during invincibility.
       const anim = pickAnim(s);
       sprites[anim].update(frameDeltaMs);
       const flipped = facingRef.current < 0;
-      // Sprite is 32x32; align bottom with hitbox bottom (py + PLAYER_H).
+
+      let alpha = 1;
+      if (s.invincibleMs > 0) {
+        const phase = Math.floor(performance.now() / 100) % 2;
+        alpha = phase === 0 ? 0.3 : 1;
+      }
+      ctx.globalAlpha = alpha;
       const drewSprite = sprites[anim].draw(
         ctx,
         Math.round(s.px),
@@ -440,11 +523,10 @@ export default function Game({ level, onLevelComplete }: Props) {
         flipped
       );
       if (!drewSprite) {
-        // Sprite not loaded yet — hitbox-shaped placeholder so the player
-        // is still visible during the first few frames.
         ctx.fillStyle = "rgba(255,255,255,0.5)";
         ctx.fillRect(s.px, s.py, PLAYER_W, PLAYER_H);
       }
+      ctx.globalAlpha = 1;
 
       ctx.restore();
     };
@@ -479,10 +561,20 @@ export default function Game({ level, onLevelComplete }: Props) {
   }, []);
 
   return (
-    <div className="relative w-full bg-zinc-950 px-2 pb-6 pt-3 text-zinc-100 sm:px-4">
+    <div
+      className={
+        isTouch
+          ? "fixed inset-0 z-10 w-full bg-zinc-950 text-zinc-100"
+          : "relative w-full bg-zinc-950 px-2 pb-6 pt-3 text-zinc-100 sm:px-4"
+      }
+    >
       <div
-        className="relative mx-auto w-full max-w-[960px] overflow-hidden rounded-md border border-zinc-800 shadow-xl"
-        style={{ aspectRatio: "2 / 1" }}
+        className={
+          isTouch
+            ? "relative h-[100dvh] w-full overflow-hidden bg-zinc-950"
+            : "relative mx-auto w-full max-w-[960px] overflow-hidden rounded-md border border-zinc-800 shadow-xl"
+        }
+        style={isTouch ? undefined : { aspectRatio: "2 / 1" }}
       >
         <div
           className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1.5"
@@ -496,8 +588,12 @@ export default function Game({ level, onLevelComplete }: Props) {
           height={CANVAS_H}
           tabIndex={0}
           onClick={(e) => e.currentTarget.focus()}
-          className="block h-auto w-full max-w-[100vw] outline-none [image-rendering:pixelated]"
-          style={{ aspectRatio: "2 / 1", touchAction: "none" }}
+          className={
+            isTouch
+              ? "block h-full w-full object-cover outline-none [image-rendering:pixelated]"
+              : "block h-auto w-full max-w-[100vw] outline-none [image-rendering:pixelated]"
+          }
+          style={isTouch ? { touchAction: "none" } : { aspectRatio: "2 / 1", touchAction: "none" }}
           aria-label={`${level.locationName} game canvas`}
         />
 
@@ -536,9 +632,7 @@ export default function Game({ level, onLevelComplete }: Props) {
                 <span className="text-amber-400" aria-hidden>
                   ★
                 </span>
-                <span
-                  className="font-pixel text-[10px] uppercase tracking-[0.2em] text-amber-300"
-                >
+                <span className="font-pixel text-[10px] uppercase tracking-[0.2em] text-amber-300">
                   Solution Unlocked
                 </span>
               </div>
@@ -563,11 +657,11 @@ export default function Game({ level, onLevelComplete }: Props) {
         {isTouch && <MobileControls onPress={handleMobilePress} />}
       </div>
 
-      <p className="mx-auto mt-3 max-w-[960px] text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500 sm:text-xs">
-        {isTouch
-          ? "Tap controls below · jump on enemies"
-          : "Arrow keys / A·D to move · ↑ / W / Space to jump"}
-      </p>
+      {!isTouch && (
+        <p className="mx-auto mt-3 max-w-[960px] text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500 sm:text-xs">
+          Arrow keys / A·D to move · ↑ / W / Space to jump
+        </p>
+      )}
     </div>
   );
 }
@@ -615,26 +709,64 @@ function drawFlagFallback(
   ctx.fill();
 }
 
-function drawEnemy(ctx: CanvasRenderingContext2D, e: EnemyState) {
+function drawEnemy(
+  ctx: CanvasRenderingContext2D,
+  e: EnemyState,
+  atlas: HTMLImageElement | null
+) {
+  // Enemy art — drawImage if atlas loaded, else flat rectangle so the
+  // hitbox is still visible during loading.
+  const drawSize = e.spriteSize;
+  const drawX = e.x + ENEMY_W / 2 - drawSize / 2;
+  const drawY = e.y + ENEMY_H - drawSize;
+  if (atlas) {
+    const crop = ASSETS.enemySheet.crops[e.spriteKey];
+    ctx.drawImage(atlas, crop.sx, crop.sy, crop.sw, crop.sh, drawX, drawY, drawSize, drawSize);
+  } else {
+    ctx.fillStyle = "#dc2626";
+    ctx.fillRect(e.x, e.y, ENEMY_W, ENEMY_H);
+  }
+
+  // Label pill — opaque black bg, centred on enemy x, white text.
   ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
   ctx.textAlign = "center";
-  const labelY = e.y - 12;
+  ctx.textBaseline = "middle";
+  const labelMidY = e.y - 18;
   const tw = ctx.measureText(e.label).width;
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
-  ctx.fillRect(e.x + ENEMY_W / 2 - tw / 2 - 5, labelY - 11, tw + 10, 16);
-  ctx.fillStyle = "#fff";
-  ctx.fillText(e.label, e.x + ENEMY_W / 2, labelY);
+  const padding = 8;
+  const pillW = tw + padding * 2;
+  const pillH = 18;
+  const pillX = Math.round(e.x + ENEMY_W / 2 - pillW / 2);
+  const pillY = Math.round(labelMidY - pillH / 2);
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillRect(pillX, pillY, pillW, pillH);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(e.label, e.x + ENEMY_W / 2, labelMidY + 0.5);
   ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+}
 
-  ctx.fillStyle = "#dc2626";
-  ctx.fillRect(e.x, e.y, ENEMY_W, ENEMY_H);
-  ctx.fillStyle = "#a31818";
-  ctx.fillRect(e.x, e.y + ENEMY_H - 4, ENEMY_W, 4);
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(e.x + 5, e.y + 7, 6, 7);
-  ctx.fillRect(e.x + ENEMY_W - 11, e.y + 7, 6, 7);
-  const pupilOffset = e.vx > 0 ? 3 : e.vx < 0 ? 0 : 1;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(e.x + 5 + pupilOffset, e.y + 9, 3, 3);
-  ctx.fillRect(e.x + ENEMY_W - 11 + pupilOffset, e.y + 9, 3, 3);
+function drawTutorialHint(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number
+) {
+  const text = "↑ JUMP ON THEM";
+  ctx.font = "bold 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const tw = ctx.measureText(text).width;
+  const padding = 10;
+  const pillW = tw + padding * 2;
+  const pillH = 22;
+  const pillX = Math.round(centerX - pillW / 2);
+  const pillY = Math.round(centerY - pillH / 2);
+  // Subtle bob.
+  const bob = Math.sin(performance.now() / 240) * 2;
+  ctx.fillStyle = "rgba(245,197,24,0.95)";
+  ctx.fillRect(pillX, pillY + bob, pillW, pillH);
+  ctx.fillStyle = "#1a1208";
+  ctx.fillText(text, centerX, centerY + bob + 0.5);
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
 }
