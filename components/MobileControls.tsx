@@ -31,45 +31,67 @@ export default function MobileControls({ onPress }: Props) {
     onContextMenu: (e: ReactPointerEvent<HTMLButtonElement>) => e.preventDefault(),
   });
 
-  const baseBtn =
-    "grid place-items-center rounded-full border text-white shadow-lg backdrop-blur transition select-none active:scale-95";
-  const dpadBtn =
-    "bg-[rgba(255,255,255,0.10)] border-[rgba(255,255,255,0.30)] active:bg-[rgba(255,255,255,0.25)]";
-  const jumpBtn =
-    "bg-[rgba(245,197,24,0.18)] border-[rgba(245,197,24,0.45)] active:bg-[rgba(245,197,24,0.35)]";
+  // Outer button = invisible tap area (88x88 dpad / 96x96 jump).
+  // Inner span = visible circle (72x72 dpad / 80x80 jump).
+  const outerBase =
+    "grid place-items-center game-no-select active:scale-95 transition";
+  const visibleBase =
+    "grid place-items-center rounded-full border text-white shadow-lg backdrop-blur game-no-select";
+  const dpadVisible =
+    "bg-[rgba(255,255,255,0.10)] border-[rgba(255,255,255,0.30)] group-active:bg-[rgba(255,255,255,0.25)]";
+  const jumpVisible =
+    "bg-[rgba(245,197,24,0.18)] border-[rgba(245,197,24,0.45)] group-active:bg-[rgba(245,197,24,0.35)]";
   const pulseClass = showPulse ? "animate-touch-pulse" : "";
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-end justify-between px-4 pb-4"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-end justify-between px-5 pb-5 game-no-select"
       style={{ touchAction: "none" }}
     >
-      <div className="pointer-events-auto flex gap-2">
+      <div className="pointer-events-auto flex gap-3 game-no-select">
         <button
           type="button"
           aria-label="Move left"
-          className={`${baseBtn} ${dpadBtn} ${pulseClass} h-14 w-14 text-2xl font-bold`}
+          className={`group ${outerBase} h-22 w-22`}
+          style={{ height: 88, width: 88, background: "transparent", border: "none" }}
           {...bind("left")}
         >
-          ←
+          <span
+            className={`${visibleBase} ${dpadVisible} ${pulseClass} text-2xl font-bold`}
+            style={{ height: 72, width: 72 }}
+          >
+            ←
+          </span>
         </button>
         <button
           type="button"
           aria-label="Move right"
-          className={`${baseBtn} ${dpadBtn} ${pulseClass} h-14 w-14 text-2xl font-bold`}
+          className={`group ${outerBase}`}
+          style={{ height: 88, width: 88, background: "transparent", border: "none" }}
           {...bind("right")}
         >
-          →
+          <span
+            className={`${visibleBase} ${dpadVisible} ${pulseClass} text-2xl font-bold`}
+            style={{ height: 72, width: 72 }}
+          >
+            →
+          </span>
         </button>
       </div>
-      <div className="pointer-events-auto">
+      <div className="pointer-events-auto game-no-select">
         <button
           type="button"
           aria-label="Jump"
-          className={`${baseBtn} ${jumpBtn} ${pulseClass} h-14 w-14 text-[10px] font-black uppercase tracking-[0.18em]`}
+          className={`group ${outerBase}`}
+          style={{ height: 96, width: 96, background: "transparent", border: "none" }}
           {...bind("jump")}
         >
-          Jump
+          <span
+            className={`${visibleBase} ${jumpVisible} ${pulseClass} text-[11px] font-black uppercase tracking-[0.18em]`}
+            style={{ height: 80, width: 80 }}
+          >
+            Jump
+          </span>
         </button>
       </div>
     </div>

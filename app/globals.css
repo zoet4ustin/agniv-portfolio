@@ -85,3 +85,11 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+/* Suppress iOS long-press menus + selection highlight on game surfaces. */
+.game-no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}

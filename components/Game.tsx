@@ -560,19 +560,21 @@ export default function Game({ level, onLevelComplete }: Props) {
     }
   }, []);
 
+  const noSelect = "game-no-select";
+
   return (
     <div
       className={
         isTouch
-          ? "fixed inset-0 z-10 w-full bg-zinc-950 text-zinc-100"
-          : "relative w-full bg-zinc-950 px-2 pb-6 pt-3 text-zinc-100 sm:px-4"
+          ? `fixed inset-0 overflow-hidden bg-black text-zinc-100 ${noSelect}`
+          : `relative w-full bg-zinc-950 px-2 pb-6 pt-3 text-zinc-100 sm:px-4 ${noSelect}`
       }
     >
       <div
         className={
           isTouch
-            ? "relative h-[100dvh] w-full overflow-hidden bg-zinc-950"
-            : "relative mx-auto w-full max-w-[960px] overflow-hidden rounded-md border border-zinc-800 shadow-xl"
+            ? `absolute inset-0 overflow-hidden bg-black ${noSelect}`
+            : `relative mx-auto w-full max-w-[960px] overflow-hidden rounded-md border border-zinc-800 shadow-xl ${noSelect}`
         }
         style={isTouch ? undefined : { aspectRatio: "2 / 1" }}
       >
@@ -590,25 +592,29 @@ export default function Game({ level, onLevelComplete }: Props) {
           onClick={(e) => e.currentTarget.focus()}
           className={
             isTouch
-              ? "block h-full w-full object-cover outline-none [image-rendering:pixelated]"
-              : "block h-auto w-full max-w-[100vw] outline-none [image-rendering:pixelated]"
+              ? `absolute inset-0 block h-full w-full object-cover outline-none [image-rendering:pixelated] ${noSelect}`
+              : `block h-auto w-full max-w-[100vw] outline-none [image-rendering:pixelated] ${noSelect}`
           }
-          style={isTouch ? { touchAction: "none" } : { aspectRatio: "2 / 1", touchAction: "none" }}
+          style={
+            isTouch
+              ? { touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }
+              : { aspectRatio: "2 / 1", touchAction: "none" }
+          }
           aria-label={`${level.locationName} game canvas`}
         />
 
-        <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col gap-1 sm:left-4 sm:top-4">
-          <div className="rounded-md border border-white/15 bg-black/55 px-3 py-1.5 font-mono text-[11px] uppercase tracking-widest text-white shadow backdrop-blur sm:text-xs">
+        <div className={`pointer-events-none absolute left-3 top-3 z-20 flex flex-col gap-1 sm:left-4 sm:top-4 ${noSelect}`}>
+          <div className={`rounded-md border border-white/15 bg-black/55 px-3 py-1.5 font-mono text-[11px] uppercase tracking-widest text-white shadow backdrop-blur sm:text-xs ${noSelect}`}>
             {level.company}
           </div>
-          <div className="rounded-md border border-white/15 bg-black/55 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white shadow backdrop-blur sm:text-[11px]">
+          <div className={`rounded-md border border-white/15 bg-black/55 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-white shadow backdrop-blur sm:text-[11px] ${noSelect}`}>
             Solutions unlocked: {solutions} / {level.enemies.length}
           </div>
         </div>
 
         <Link
           href="/resume"
-          className="absolute right-3 top-3 z-20 rounded-md border border-white/20 bg-black/55 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-white shadow backdrop-blur transition hover:bg-black/80 sm:right-4 sm:top-4 sm:text-xs"
+          className={`absolute right-3 top-3 z-20 rounded-md border border-white/20 bg-black/55 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-white shadow backdrop-blur transition hover:bg-black/80 sm:right-4 sm:top-4 sm:text-xs ${noSelect}`}
         >
           Skip the game, see resume →
         </Link>
@@ -617,7 +623,7 @@ export default function Game({ level, onLevelComplete }: Props) {
           <div
             role="status"
             aria-live="polite"
-            className="pointer-events-none absolute left-1/2 top-10 z-30 w-[min(360px,90%)] sm:top-12"
+            className={`pointer-events-none absolute left-1/2 top-10 z-30 w-[min(360px,90%)] sm:top-12 ${noSelect}`}
             style={{
               animation: toastShown
                 ? "lootDropIn 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards"
@@ -658,7 +664,7 @@ export default function Game({ level, onLevelComplete }: Props) {
       </div>
 
       {!isTouch && (
-        <p className="mx-auto mt-3 max-w-[960px] text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500 sm:text-xs">
+        <p className={`mx-auto mt-3 max-w-[960px] text-center font-mono text-[10px] uppercase tracking-widest text-zinc-500 sm:text-xs ${noSelect}`}>
           Arrow keys / A·D to move · ↑ / W / Space to jump
         </p>
       )}
