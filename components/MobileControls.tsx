@@ -36,11 +36,13 @@ export default function MobileControls({ onPress }: Props) {
   const outerBase =
     "grid place-items-center game-no-select active:scale-95 transition";
   const visibleBase =
-    "grid place-items-center rounded-full border text-white shadow-lg backdrop-blur game-no-select";
+    "grid place-items-center rounded-full border shadow-lg backdrop-blur game-no-select";
+  // Idle/pressed alpha values per spec — buttons feel ghostly until pressed.
   const dpadVisible =
-    "bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.18)] group-active:bg-[rgba(255,255,255,0.18)]";
+    "bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.14)] group-active:bg-[rgba(255,255,255,0.16)] group-active:border-[rgba(255,255,255,0.30)]";
   const jumpVisible =
-    "bg-[rgba(245,197,24,0.06)] border-[rgba(245,197,24,0.20)] group-active:bg-[rgba(245,197,24,0.20)]";
+    "bg-[rgba(245,197,24,0.05)] border-[rgba(245,197,24,0.16)] group-active:bg-[rgba(245,197,24,0.18)] group-active:border-[rgba(245,197,24,0.32)]";
+  const iconColor = "text-[rgba(255,255,255,0.55)]";
   const pulseClass = showPulse ? "animate-touch-pulse" : "";
 
   return (
@@ -57,7 +59,7 @@ export default function MobileControls({ onPress }: Props) {
           {...bind("left")}
         >
           <span
-            className={`${visibleBase} ${dpadVisible} ${pulseClass} text-2xl font-bold`}
+            className={`${visibleBase} ${dpadVisible} ${pulseClass} ${iconColor} text-2xl font-bold`}
             style={{ height: 72, width: 72 }}
           >
             ←
@@ -71,7 +73,7 @@ export default function MobileControls({ onPress }: Props) {
           {...bind("right")}
         >
           <span
-            className={`${visibleBase} ${dpadVisible} ${pulseClass} text-2xl font-bold`}
+            className={`${visibleBase} ${dpadVisible} ${pulseClass} ${iconColor} text-2xl font-bold`}
             style={{ height: 72, width: 72 }}
           >
             →
@@ -87,7 +89,7 @@ export default function MobileControls({ onPress }: Props) {
           {...bind("jump")}
         >
           <span
-            className={`${visibleBase} ${jumpVisible} ${pulseClass} text-[11px] font-black uppercase tracking-[0.18em]`}
+            className={`${visibleBase} ${jumpVisible} ${pulseClass} ${iconColor} text-[11px] font-black uppercase tracking-[0.18em]`}
             style={{ height: 80, width: 80 }}
           >
             Jump

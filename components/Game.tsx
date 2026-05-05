@@ -116,6 +116,8 @@ export default function Game({ level, onLevelComplete }: Props) {
   const [chipKey, setChipKey] = useState(0);
   const [levelCompleted, setLevelCompleted] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(true);
 
   const keysRef = useRef<Keys>({
     left: false,
@@ -136,6 +138,7 @@ export default function Game({ level, onLevelComplete }: Props) {
   });
   const facingRef = useRef<1 | -1>(1);
   const isTouchRef = useRef(false);
+  const isPortraitRef = useRef(false);
   const tutorialRef = useRef<TutorialState>({
     enemyId: null,
     shownAt: 0,
@@ -162,15 +165,36 @@ export default function Game({ level, onLevelComplete }: Props) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(pointer: coarse)");
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const portrait = window.matchMedia("(orientation: portrait)");
     const sync = () => {
-      setIsTouch(mq.matches);
-      isTouchRef.current = mq.matches;
+      setIsTouch(coarse.matches);
+      isTouchRef.current = coarse.matches;
+      setIsPortrait(portrait.matches);
+      isPortraitRef.current = portrait.matches;
     };
     sync();
-    const onChange = () => sync();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    coarse.addEventListener("change", sync);
+    portrait.addEventListener("change", sync);
+    return () => {
+      coarse.removeEventListener("change", sync);
+      portrait.removeEventListener("change", sync);
+    };
+  }, []);
+
+  // Portrait banner: visible on touch+portrait until user dismisses (persisted).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const seen = window.localStorage.getItem("portraitBannerDismissed") === "true";
+    setBannerDismissed(seen);
+  }, []);
+  const dismissBanner = useCallback(() => {
+    setBannerDismissed(true);
+    try {
+      window.localStorage.setItem("portraitBannerDismissed", "true");
+    } catch {
+      // ignore
+    }
   }, []);
 
   // Keyboard
@@ -438,8 +462,11 @@ export default function Game({ level, onLevelComplete }: Props) {
         drawCloud(ctx, cx, 60 + (i % 2) * 28);
       }
 
-      // Mobile: shift world up 40px so action sits above touch buttons.
-      const verticalShift = isTouchRef.current ? -MOBILE_VERTICAL_SHIFT : 0;
+      // Mobile landscape: shift world up 40px so action sits above the
+      // overlaid touch buttons. In portrait the joysticks live in their own
+      // dedicated zone below the canvas, so no shift is needed.
+      const verticalShift =
+        isTouchRef.current && !isPortraitRef.current ? -MOBILE_VERTICAL_SHIFT : 0;
 
       ctx.save();
       ctx.translate(-Math.round(s.cameraX), verticalShift);
@@ -513,7 +540,7 @@ export default function Game({ level, onLevelComplete }: Props) {
       // Enemies (sprites from 20 Enemies.png crops, with rectangle fallback).
       for (const e of s.enemies) {
         if (!e.alive) continue;
-        drawEnemy(ctx, e, enemyAtlas.image);
+        drawEnemy(ctx, e, enemyAtlas.image, s.cameraX);
       }
 
       // Tutorial hint above the chosen enemy.
@@ -578,7 +605,150 @@ export default function Game({ level, onLevelComplete }: Props) {
   }, []);
 
   const noSelect = "game-no-select";
+  const showBanner = isTouch && isPortrait && !bannerDismissed;
 
+  // Reusable canvas element — same DOM node for every layout (so the ref +
+  // game loop don't need to re-mount when orientation flips).
+  const canvasNode = (className: string, extraStyle?: React.CSSProperties) => (
+    <canvas
+      ref={canvasRef}
+      width={CANVAS_W}
+      height={CANVAS_H}
+      tabIndex={0}
+      onClick={(e) => e.currentTarget.focus()}
+      className={`outline-none [image-rendering:pixelated] ${noSelect} ${className}`}
+      style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none", ...extraStyle }}
+      aria-label={`${level.locationName} game canvas`}
+    />
+  );
+
+  const toastEl = toast && !levelCompleted ? (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`pointer-events-none absolute left-1/2 top-10 z-30 w-[min(360px,90%)] sm:top-12 ${noSelect}`}
+      style={{
+        animation: toastShown
+          ? "lootDropIn 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards"
+          : `lootCollapseToChip ${TOAST_OUT_MS}ms ease-in forwards`,
+      }}
+    >
+      <div
+        className="rounded-md border-2 bg-zinc-950/95 px-4 py-3 shadow-2xl backdrop-blur"
+        style={{ borderColor: "#f5c518" }}
+      >
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-amber-400" aria-hidden>★</span>
+          <span className="font-pixel text-[10px] uppercase tracking-[0.2em] text-amber-300">
+            Solution Unlocked
+          </span>
+        </div>
+        <div className="space-y-1 font-mono text-[11px] leading-snug text-zinc-200 sm:text-xs">
+          <p><span className="text-zinc-500">Problem:</span> {toast.problem}</p>
+          <p><span className="text-zinc-500">Solution:</span> {toast.solution}</p>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <span className="rounded-sm border border-amber-400/60 bg-amber-400/15 px-2 py-0.5 font-pixel text-[9px] uppercase tracking-widest text-amber-200">
+            +1 Solution
+          </span>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  // Chip position varies by layout.
+  const chipStyle: React.CSSProperties = (() => {
+    if (isTouch && isPortrait) return { top: 8, left: 8 };
+    if (isTouch && !isPortrait) return { bottom: 88, left: 16 };
+    return { bottom: 16, left: 16 };
+  })();
+
+  const chipEl = !levelCompleted && latestSolution ? (
+    <button
+      key={chipKey}
+      type="button"
+      onClick={() => showToast(latestSolution, TOAST_REEXPAND_MS, false)}
+      aria-label={`Re-show solution: ${latestSolution.problem}`}
+      className={`absolute z-20 flex max-w-[60%] items-center gap-1.5 rounded-md border-2 bg-zinc-950/90 px-2.5 py-1.5 text-left shadow-lg backdrop-blur transition hover:bg-zinc-950 ${noSelect}`}
+      style={{
+        borderColor: "#f5c518",
+        ...chipStyle,
+        animation: "chipFadeIn 0.35s ease-out backwards, chipPulse 1.1s ease-in-out 0s 3",
+      }}
+    >
+      <span className="text-amber-400" aria-hidden>★</span>
+      <span className="font-mono text-[10px] uppercase tracking-widest text-amber-200">
+        Last solved:
+      </span>
+      <span className="truncate font-mono text-[11px] text-zinc-100">
+        {latestSolution.problem}
+      </span>
+    </button>
+  ) : null;
+
+  // ─── PORTRAIT (touch + portrait): HUD bar / canvas / joystick zone ─────
+  if (isTouch && isPortrait) {
+    return (
+      <div className={`fixed inset-0 flex flex-col bg-black text-zinc-100 ${noSelect}`} style={{ height: "100dvh" }}>
+        {/* HUD strip */}
+        <div className={`flex items-center justify-between border-b border-white/10 bg-zinc-950 px-3 py-2 ${noSelect}`}>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-white">
+              {level.company}
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-zinc-400">
+              Solutions: {solutions} / {level.enemies.length}
+            </span>
+          </div>
+          <Link
+            href="/resume"
+            className="rounded-md border border-white/20 bg-black/55 px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-white"
+          >
+            Skip →
+          </Link>
+        </div>
+
+        {/* Dismissible rotate banner */}
+        {showBanner && (
+          <div className={`flex items-center justify-between border-b border-white/10 bg-black/55 px-3 py-1.5 backdrop-blur ${noSelect}`}>
+            <span className="font-mono text-[10px] text-white">
+              ↻ Rotate phone for fullscreen experience
+            </span>
+            <button
+              type="button"
+              onClick={dismissBanner}
+              aria-label="Dismiss banner"
+              className="ml-2 px-1 text-base leading-none text-white/70 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Canvas zone */}
+        <div className={`relative flex-1 overflow-hidden bg-black ${noSelect}`}>
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1"
+            style={{ background: level.theme }}
+            aria-hidden
+          />
+          {canvasNode(
+            "absolute inset-0 m-auto block max-h-full max-w-full",
+            { aspectRatio: "2 / 1" }
+          )}
+          {toastEl}
+          {chipEl}
+        </div>
+
+        {/* Joystick zone */}
+        <div className={`relative bg-black border-t border-white/10 ${noSelect}`} style={{ height: 120 }}>
+          <MobileControls onPress={handleMobilePress} />
+        </div>
+      </div>
+    );
+  }
+
+  // ─── LANDSCAPE TOUCH or DESKTOP (single shared structure) ──────────────
   return (
     <div
       className={
@@ -601,24 +771,12 @@ export default function Game({ level, onLevelComplete }: Props) {
           aria-hidden
         />
 
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
-          tabIndex={0}
-          onClick={(e) => e.currentTarget.focus()}
-          className={
-            isTouch
-              ? `absolute inset-0 block h-full w-full object-cover outline-none [image-rendering:pixelated] ${noSelect}`
-              : `block h-auto w-full max-w-[100vw] outline-none [image-rendering:pixelated] ${noSelect}`
-          }
-          style={
-            isTouch
-              ? { touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }
-              : { aspectRatio: "2 / 1", touchAction: "none" }
-          }
-          aria-label={`${level.locationName} game canvas`}
-        />
+        {canvasNode(
+          isTouch
+            ? "absolute inset-0 block h-full w-full object-cover"
+            : "block h-auto w-full max-w-[100vw]",
+          isTouch ? undefined : { aspectRatio: "2 / 1" }
+        )}
 
         <div className={`pointer-events-none absolute left-3 top-3 z-20 flex flex-col gap-1 sm:left-4 sm:top-4 ${noSelect}`}>
           <div className={`rounded-md border border-white/15 bg-black/55 px-3 py-1.5 font-mono text-[11px] uppercase tracking-widest text-white shadow backdrop-blur sm:text-xs ${noSelect}`}>
@@ -636,73 +794,8 @@ export default function Game({ level, onLevelComplete }: Props) {
           Skip the game, see resume →
         </Link>
 
-        {toast && !levelCompleted && (
-          <div
-            role="status"
-            aria-live="polite"
-            className={`pointer-events-none absolute left-1/2 top-10 z-30 w-[min(360px,90%)] sm:top-12 ${noSelect}`}
-            style={{
-              animation: toastShown
-                ? "lootDropIn 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards"
-                : `lootCollapseToChip ${TOAST_OUT_MS}ms ease-in forwards`,
-            }}
-          >
-            <div
-              className="rounded-md border-2 bg-zinc-950/95 px-4 py-3 shadow-2xl backdrop-blur"
-              style={{ borderColor: "#f5c518" }}
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <span className="text-amber-400" aria-hidden>
-                  ★
-                </span>
-                <span className="font-pixel text-[10px] uppercase tracking-[0.2em] text-amber-300">
-                  Solution Unlocked
-                </span>
-              </div>
-              <div className="space-y-1 font-mono text-[11px] leading-snug text-zinc-200 sm:text-xs">
-                <p>
-                  <span className="text-zinc-500">Problem:</span> {toast.problem}
-                </p>
-                <p>
-                  <span className="text-zinc-500">Solution:</span>{" "}
-                  {toast.solution}
-                </p>
-              </div>
-              <div className="mt-3 flex justify-end">
-                <span className="rounded-sm border border-amber-400/60 bg-amber-400/15 px-2 py-0.5 font-pixel text-[9px] uppercase tracking-widest text-amber-200">
-                  +1 Solution
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!levelCompleted && latestSolution && (
-          <button
-            key={chipKey}
-            type="button"
-            onClick={() => showToast(latestSolution, TOAST_REEXPAND_MS, false)}
-            aria-label={`Re-show solution: ${latestSolution.problem}`}
-            className={`absolute z-20 flex max-w-[60%] items-center gap-1.5 rounded-md border-2 bg-zinc-950/90 px-2.5 py-1.5 text-left shadow-lg backdrop-blur transition hover:bg-zinc-950 chip-pulse ${noSelect}`}
-            style={{
-              borderColor: "#f5c518",
-              bottom: isTouch ? 130 : 16,
-              left: 16,
-              animation:
-                "chipFadeIn 0.35s ease-out backwards, chipPulse 1.1s ease-in-out 0s 3",
-            }}
-          >
-            <span className="text-amber-400" aria-hidden>
-              ★
-            </span>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-amber-200">
-              Solution:
-            </span>
-            <span className="truncate font-mono text-[11px] text-zinc-100">
-              {latestSolution.problem}
-            </span>
-          </button>
-        )}
+        {toastEl}
+        {chipEl}
 
         {isTouch && <MobileControls onPress={handleMobilePress} />}
       </div>
@@ -762,7 +855,8 @@ function drawFlagFallback(
 function drawEnemy(
   ctx: CanvasRenderingContext2D,
   e: EnemyState,
-  atlas: HTMLImageElement | null
+  atlas: HTMLImageElement | null,
+  cameraX: number
 ) {
   // Enemy art — drawImage if atlas loaded, else flat rectangle so the
   // hitbox is still visible during loading.
@@ -778,6 +872,7 @@ function drawEnemy(
   }
 
   // Label pill — opaque black bg, centred on enemy x, white text.
+  // Pill is clamped within the camera viewport so it never gets cropped.
   ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -786,12 +881,15 @@ function drawEnemy(
   const padding = 8;
   const pillW = tw + padding * 2;
   const pillH = 18;
-  const pillX = Math.round(e.x + ENEMY_W / 2 - pillW / 2);
+  const desiredPillX = e.x + ENEMY_W / 2 - pillW / 2;
+  const minX = cameraX + 4;
+  const maxX = cameraX + CANVAS_W - 4 - pillW;
+  const pillX = Math.round(clamp(desiredPillX, minX, maxX));
   const pillY = Math.round(labelMidY - pillH / 2);
   ctx.fillStyle = "rgba(0,0,0,0.85)";
   ctx.fillRect(pillX, pillY, pillW, pillH);
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(e.label, e.x + ENEMY_W / 2, labelMidY + 0.5);
+  ctx.fillText(e.label, pillX + pillW / 2, labelMidY + 0.5);
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 }
