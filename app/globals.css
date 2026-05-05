@@ -34,6 +34,26 @@ body {
   0%   { transform: translate(-50%, 0)     scale(1);    opacity: 1; }
   100% { transform: translate(-50%, -120%) scale(0.95); opacity: 0; }
 }
+/* Used when the full toast collapses into the persistent corner chip:
+   shrinks toward bottom-left while fading. */
+@keyframes lootCollapseToChip {
+  0%   { transform: translate(-50%, 0) scale(1); opacity: 1; }
+  60%  { transform: translate(calc(-50% - 18vw), 30vh) scale(0.55); opacity: 0.65; }
+  100% { transform: translate(calc(-50% - 35vw), 60vh) scale(0.3); opacity: 0; }
+}
+
+/* Solution chip that persists at bottom-left. */
+@keyframes chipFadeIn {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0)   scale(1); }
+}
+@keyframes chipPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.02); }
+}
+.chip-pulse {
+  animation: chipPulse 1.1s ease-in-out 0s 3;
+}
 
 /* Touch button attention pulse — runs for ~3s on first load. */
 @keyframes touchPulse {

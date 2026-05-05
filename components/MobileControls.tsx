@@ -38,9 +38,9 @@ export default function MobileControls({ onPress }: Props) {
   const visibleBase =
     "grid place-items-center rounded-full border text-white shadow-lg backdrop-blur game-no-select";
   const dpadVisible =
-    "bg-[rgba(255,255,255,0.10)] border-[rgba(255,255,255,0.30)] group-active:bg-[rgba(255,255,255,0.25)]";
+    "bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.18)] group-active:bg-[rgba(255,255,255,0.18)]";
   const jumpVisible =
-    "bg-[rgba(245,197,24,0.18)] border-[rgba(245,197,24,0.45)] group-active:bg-[rgba(245,197,24,0.35)]";
+    "bg-[rgba(245,197,24,0.06)] border-[rgba(245,197,24,0.20)] group-active:bg-[rgba(245,197,24,0.20)]";
   const pulseClass = showPulse ? "animate-touch-pulse" : "";
 
   return (

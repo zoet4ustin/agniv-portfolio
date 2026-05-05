@@ -28,7 +28,9 @@ const FRICTION = 0.7;
 const MAX_FALL = 14;
 
 const TICK_MS = 1000 / 60;
-const TOAST_MS = 4000;
+const TOAST_MS = 2000;
+const TOAST_REEXPAND_MS = 3000;
+const TOAST_OUT_MS = 400; // matches lootCollapseToChip duration
 const INVINCIBLE_MS = 1500;
 const TUTORIAL_RANGE = 200;
 const TUTORIAL_DURATION_MS = 4000;
@@ -110,6 +112,9 @@ export default function Game({ level, onLevelComplete }: Props) {
   const [solutions, setSolutions] = useState(0);
   const [toast, setToast] = useState<ToastPayload | null>(null);
   const [toastShown, setToastShown] = useState(false);
+  const [latestSolution, setLatestSolution] = useState<ToastPayload | null>(null);
+  const [chipKey, setChipKey] = useState(0);
+  const [levelCompleted, setLevelCompleted] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
 
   const keysRef = useRef<Keys>({
@@ -202,23 +207,34 @@ export default function Game({ level, onLevelComplete }: Props) {
     };
   }, []);
 
-  const showToast = useCallback((payload: ToastPayload) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    if (toastHideTimerRef.current) clearTimeout(toastHideTimerRef.current);
-    toastTimerRef.current = null;
-    toastHideTimerRef.current = null;
-    setToast(payload);
-    setToastShown(false);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setToastShown(true));
-    });
-    toastTimerRef.current = window.setTimeout(() => {
+  // showToast: pop the big toast at the top, then collapse it after
+  // `durationMs`. Always updates `latestSolution` so the persistent chip
+  // stays in sync with the most recently unlocked solution.
+  const showToast = useCallback(
+    (payload: ToastPayload, durationMs = TOAST_MS, updateChip = true) => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (toastHideTimerRef.current) clearTimeout(toastHideTimerRef.current);
+      toastTimerRef.current = null;
+      toastHideTimerRef.current = null;
+
+      setToast(payload);
       setToastShown(false);
-      toastHideTimerRef.current = window.setTimeout(() => {
-        setToast(null);
-      }, 320);
-    }, TOAST_MS);
-  }, []);
+      if (updateChip) {
+        setLatestSolution(payload);
+        setChipKey((k) => k + 1);
+      }
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setToastShown(true));
+      });
+      toastTimerRef.current = window.setTimeout(() => {
+        setToastShown(false);
+        toastHideTimerRef.current = window.setTimeout(() => {
+          setToast(null);
+        }, TOAST_OUT_MS);
+      }, durationMs);
+    },
+    []
+  );
 
   // Game loop
   useEffect(() => {
@@ -393,6 +409,7 @@ export default function Game({ level, onLevelComplete }: Props) {
 
       if (!s.completed && s.px >= flagX) {
         s.completed = true;
+        setLevelCompleted(true);
         onCompleteRef.current();
       }
     };
@@ -619,7 +636,7 @@ export default function Game({ level, onLevelComplete }: Props) {
           Skip the game, see resume →
         </Link>
 
-        {toast && (
+        {toast && !levelCompleted && (
           <div
             role="status"
             aria-live="polite"
@@ -627,7 +644,7 @@ export default function Game({ level, onLevelComplete }: Props) {
             style={{
               animation: toastShown
                 ? "lootDropIn 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards"
-                : "lootDropOut 0.3s ease-in forwards",
+                : `lootCollapseToChip ${TOAST_OUT_MS}ms ease-in forwards`,
             }}
           >
             <div
@@ -658,6 +675,33 @@ export default function Game({ level, onLevelComplete }: Props) {
               </div>
             </div>
           </div>
+        )}
+
+        {!levelCompleted && latestSolution && (
+          <button
+            key={chipKey}
+            type="button"
+            onClick={() => showToast(latestSolution, TOAST_REEXPAND_MS, false)}
+            aria-label={`Re-show solution: ${latestSolution.problem}`}
+            className={`absolute z-20 flex max-w-[60%] items-center gap-1.5 rounded-md border-2 bg-zinc-950/90 px-2.5 py-1.5 text-left shadow-lg backdrop-blur transition hover:bg-zinc-950 chip-pulse ${noSelect}`}
+            style={{
+              borderColor: "#f5c518",
+              bottom: isTouch ? 130 : 16,
+              left: 16,
+              animation:
+                "chipFadeIn 0.35s ease-out backwards, chipPulse 1.1s ease-in-out 0s 3",
+            }}
+          >
+            <span className="text-amber-400" aria-hidden>
+              ★
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-amber-200">
+              Solution:
+            </span>
+            <span className="truncate font-mono text-[11px] text-zinc-100">
+              {latestSolution.problem}
+            </span>
+          </button>
         )}
 
         {isTouch && <MobileControls onPress={handleMobilePress} />}

@@ -1,7 +1,36 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect } from "react";
 import { contact } from "@/lib/contact";
 
 export default function ResumePage() {
+  // Make device-back land on /#chapters even when /resume was a deep link.
+  // If we can detect that the user came in from same-origin /#chapters
+  // (browser already has it in history), do nothing. Otherwise insert
+  // /#chapters as a phantom previous entry so back gestures land there.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cameFromInternalChapters = false;
+    try {
+      if (document.referrer) {
+        const u = new URL(document.referrer);
+        cameFromInternalChapters =
+          u.origin === window.location.origin &&
+          (u.hash === "#chapters" || u.pathname === "/");
+      }
+    } catch {
+      // bad URL — treat as deep link
+    }
+    if (cameFromInternalChapters) return;
+    try {
+      window.history.replaceState(null, "", "/#chapters");
+      window.history.pushState(null, "", "/resume");
+    } catch {
+      // history API unavailable — fall through; explicit back link still works
+    }
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-zinc-950 text-zinc-100">
       <div className="mx-auto w-full max-w-3xl px-6 py-16">
@@ -9,7 +38,7 @@ export default function ResumePage() {
           href="/#chapters"
           className="mb-10 inline-block font-mono text-xs uppercase tracking-widest text-zinc-400 transition hover:text-white"
         >
-          ← Back to game
+          ← Choose a chapter
         </Link>
 
         <header className="mb-10 border-b border-zinc-800 pb-6">
