@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Level } from "@/lib/levels";
+import { levels as ALL_LEVELS } from "@/lib/levels";
 import { ASSETS, type EnemySpriteKey } from "@/lib/assets";
 import { AnimatedSprite, StaticImage } from "@/lib/sprite";
 import MobileControls, { type MobileKey } from "./MobileControls";
@@ -33,8 +34,21 @@ const TOAST_REEXPAND_MS = 3000;
 const TOAST_OUT_MS = 400; // matches lootCollapseToChip duration
 const INVINCIBLE_MS = 1500;
 const TUTORIAL_RANGE = 200;
-const TUTORIAL_DURATION_MS = 4000;
+const TUTORIAL_DURATION_MS = 5000;
+const INTRO_AUTO_DISMISS_MS = 4000;
 const MOBILE_VERTICAL_SHIFT = 40; // shift world up on mobile so action sits above touch buttons
+
+const TUTORIAL_SS_KEY = "tutorial_hint_shown";
+const BOSS_TOAST_SS_KEY = "boss_toast_shown_cars24";
+const introSsKey = (slug: string) => `level_intro_shown_${slug}`;
+
+const HIRING_MAILTO = (() => {
+  const subject = encodeURIComponent("Hiring conversation");
+  const body = encodeURIComponent(
+    "Hi Agniv,\r\n\r\nI played your portfolio and want to talk about a role.\r\n\r\n"
+  );
+  return `mailto:connect.agnivkashyap@gmail.com?subject=${subject}&body=${body}`;
+})();
 
 type EnemyState = {
   id: string;
@@ -105,7 +119,6 @@ type TutorialState = {
   dismissed: boolean;
 };
 
-const TUTORIAL_LS_KEY = "tutorialShown";
 
 export default function Game({ level, onLevelComplete }: Props) {
   const [solutions, setSolutions] = useState(0);
@@ -118,6 +131,11 @@ export default function Game({ level, onLevelComplete }: Props) {
   const [isPortrait, setIsPortrait] = useState(false);
   // Banner is per-mount: navigating away and back re-shows it.
   const [bannerDismissed, setBannerDismissed] = useState(false);
+  // Intro card — shown once per level per session.
+  const [showIntro, setShowIntro] = useState(false);
+  // Boss "still fighting" toast — only on Cars24, only the first stomp.
+  const [bossToast, setBossToast] = useState(false);
+  const [bossToastShown, setBossToastShown] = useState(false);
   // Canvas is referenced via state + callback ref so the game loop's
   // useEffect re-runs (and re-attaches its rAF + 2d context) whenever the
   // canvas DOM node changes — e.g. when the layout flips between portrait
@@ -147,6 +165,13 @@ export default function Game({ level, onLevelComplete }: Props) {
   const facingRef = useRef<1 | -1>(1);
   const isTouchRef = useRef(false);
   const isPortraitRef = useRef(false);
+  // Whether physics + input are paused (intro card up).
+  const pausedRef = useRef(false);
+  // Tracks whether the boss toast has fired in this session — survives
+  // bouncing repeatedly off the boss without re-firing.
+  const bossToastSessionRef = useRef(false);
+  const bossToastTimerRef = useRef<number | null>(null);
+  const bossToastHideTimerRef = useRef<number | null>(null);
   const tutorialRef = useRef<TutorialState>({
     enemyId: null,
     shownAt: 0,
@@ -160,14 +185,11 @@ export default function Game({ level, onLevelComplete }: Props) {
     onCompleteRef.current = onLevelComplete;
   }, [onLevelComplete]);
 
-  // Keep tutorial state in sync with localStorage and level change.
+  // Tutorial hint is level-agnostic: shown once per session, on the first
+  // regular (non-boss) enemy the player approaches in any level.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (level.slug !== "flipkart") {
-      tutorialRef.current = { enemyId: null, shownAt: 0, dismissed: true };
-      return;
-    }
-    const seen = window.localStorage.getItem(TUTORIAL_LS_KEY) === "true";
+    const seen = window.sessionStorage.getItem(TUTORIAL_SS_KEY) === "true";
     tutorialRef.current = { enemyId: null, shownAt: 0, dismissed: seen };
   }, [level.slug]);
 
@@ -196,6 +218,85 @@ export default function Game({ level, onLevelComplete }: Props) {
     setBannerDismissed(true);
   }, []);
 
+  // Intro card — show once per level per session. Pauses physics + input
+  // while visible.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let seen = false;
+    try {
+      seen = window.sessionStorage.getItem(introSsKey(level.slug)) === "true";
+    } catch {
+      // ignore
+    }
+    setShowIntro(!seen);
+  }, [level.slug]);
+
+  const dismissIntro = useCallback(() => {
+    setShowIntro(false);
+    try {
+      window.sessionStorage.setItem(introSsKey(level.slug), "true");
+    } catch {
+      // ignore
+    }
+  }, [level.slug]);
+
+  // Auto-dismiss the intro card.
+  useEffect(() => {
+    if (!showIntro) return;
+    const t = window.setTimeout(dismissIntro, INTRO_AUTO_DISMISS_MS);
+    return () => window.clearTimeout(t);
+  }, [showIntro, dismissIntro]);
+
+  // Enter / Space dismiss the intro card.
+  useEffect(() => {
+    if (!showIntro) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+        dismissIntro();
+      }
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
+  }, [showIntro, dismissIntro]);
+
+  // Sync the paused ref (game loop reads this each tick).
+  useEffect(() => {
+    pausedRef.current = showIntro;
+  }, [showIntro]);
+
+  // Boss toast — check session flag once per mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      bossToastSessionRef.current =
+        window.sessionStorage.getItem(BOSS_TOAST_SS_KEY) === "true";
+    } catch {
+      bossToastSessionRef.current = false;
+    }
+  }, []);
+
+  // Boss toast stays open until the user explicitly dismisses it
+  // (× button, backdrop click, or CTA tap). No auto-dismiss — this is a
+  // conversion moment, not a passing notification.
+  const triggerBossToast = useCallback(() => {
+    if (bossToastHideTimerRef.current) clearTimeout(bossToastHideTimerRef.current);
+    setBossToast(true);
+    setBossToastShown(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setBossToastShown(true));
+    });
+  }, []);
+
+  const dismissBossToast = useCallback(() => {
+    if (bossToastTimerRef.current) clearTimeout(bossToastTimerRef.current);
+    setBossToastShown(false);
+    if (bossToastHideTimerRef.current) clearTimeout(bossToastHideTimerRef.current);
+    bossToastHideTimerRef.current = window.setTimeout(() => {
+      setBossToast(false);
+    }, 320);
+  }, []);
+
   // Keyboard
   useEffect(() => {
     const isJumpKey = (k: string) =>
@@ -205,6 +306,7 @@ export default function Game({ level, onLevelComplete }: Props) {
 
     const onDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      if (pausedRef.current) return;
       if (isLeft(e.key)) {
         keysRef.current.left = true;
         e.preventDefault();
@@ -218,6 +320,7 @@ export default function Game({ level, onLevelComplete }: Props) {
       }
     };
     const onUp = (e: KeyboardEvent) => {
+      if (pausedRef.current) return;
       if (isLeft(e.key)) keysRef.current.left = false;
       else if (isRight(e.key)) keysRef.current.right = false;
       else if (isJumpKey(e.key)) keysRef.current.jump = false;
@@ -299,6 +402,12 @@ export default function Game({ level, onLevelComplete }: Props) {
       const s = stateRef.current;
       const k = keysRef.current;
       if (s.completed) return;
+      // Intro card up — freeze the world. Drop any queued jump so an
+      // input pressed during pause doesn't fire the moment we resume.
+      if (pausedRef.current) {
+        k.jumpQueued = false;
+        return;
+      }
 
       if (s.invincibleMs > 0) {
         s.invincibleMs = Math.max(0, s.invincibleMs - TICK_MS);
@@ -363,9 +472,6 @@ export default function Game({ level, onLevelComplete }: Props) {
           e.vx = -Math.abs(e.vx);
         }
 
-        if (e.isCurrentBattle) continue;
-        if (s.invincibleMs > 0) continue;
-
         const overlap =
           s.px + PLAYER_W > e.x &&
           s.px < e.x + ENEMY_W &&
@@ -374,16 +480,42 @@ export default function Game({ level, onLevelComplete }: Props) {
         if (!overlap) continue;
 
         const playerBottom = s.py + PLAYER_H;
+
+        if (e.isCurrentBattle) {
+          // Boss: top-stomp bounces the player but doesn't kill the boss
+          // (it's the "still fighting" boss). Side touch is pass-through —
+          // player can navigate around it.
+          if (s.vy > 0 && playerBottom - e.y < 18) {
+            s.py = e.y - PLAYER_H;
+            s.vy = JUMP_V * 0.6;
+            s.onGround = false;
+            // Trigger the special boss toast on the first stomp attempt
+            // this session.
+            if (!bossToastSessionRef.current && level.slug === "cars24") {
+              bossToastSessionRef.current = true;
+              try {
+                window.sessionStorage.setItem(BOSS_TOAST_SS_KEY, "true");
+              } catch {
+                // ignore
+              }
+              triggerBossToast();
+            }
+          }
+          continue;
+        }
+
+        if (s.invincibleMs > 0) continue;
+
         if (s.vy > 0 && playerBottom - e.y < 18) {
           e.alive = false;
           s.vy = JUMP_V * 0.6;
           setSolutions((c) => c + 1);
           showToast({ problem: e.label, solution: e.solution });
-          if (level.slug === "flipkart" && !tutorialRef.current.dismissed) {
+          if (!tutorialRef.current.dismissed) {
             tutorialRef.current.dismissed = true;
             tutorialRef.current.enemyId = null;
             try {
-              window.localStorage.setItem(TUTORIAL_LS_KEY, "true");
+              window.sessionStorage.setItem(TUTORIAL_SS_KEY, "true");
             } catch {
               // ignore — incognito or storage disabled
             }
@@ -397,14 +529,11 @@ export default function Game({ level, onLevelComplete }: Props) {
         }
       }
 
-      // Tutorial trigger (Flipkart only).
-      if (
-        level.slug === "flipkart" &&
-        !tutorialRef.current.dismissed &&
-        !tutorialRef.current.enemyId
-      ) {
+      // Tutorial trigger — any level, first non-boss enemy within range.
+      if (!tutorialRef.current.dismissed && !tutorialRef.current.enemyId) {
         for (const e of s.enemies) {
           if (!e.alive) continue;
+          if (e.isCurrentBattle) continue; // boss has its own treatment
           if (Math.abs(s.px - e.x) < TUTORIAL_RANGE) {
             tutorialRef.current.enemyId = e.id;
             tutorialRef.current.shownAt = performance.now();
@@ -418,7 +547,7 @@ export default function Game({ level, onLevelComplete }: Props) {
           tutorialRef.current.enemyId = null;
           tutorialRef.current.dismissed = true;
           try {
-            window.localStorage.setItem(TUTORIAL_LS_KEY, "true");
+            window.sessionStorage.setItem(TUTORIAL_SS_KEY, "true");
           } catch {
             // ignore
           }
@@ -539,9 +668,10 @@ export default function Game({ level, onLevelComplete }: Props) {
       }
 
       // Enemies (sprites from 20 Enemies.png crops, with rectangle fallback).
+      const renderNow = performance.now();
       for (const e of s.enemies) {
         if (!e.alive) continue;
-        drawEnemy(ctx, e, enemyAtlas.image, s.cameraX);
+        drawEnemy(ctx, e, enemyAtlas.image, s.cameraX, renderNow);
       }
 
       // Tutorial hint above the chosen enemy.
@@ -687,6 +817,111 @@ export default function Game({ level, onLevelComplete }: Props) {
     </button>
   ) : null;
 
+  // Intro card overlay — fixed across all layouts.
+  const levelIndex = Math.max(0, ALL_LEVELS.findIndex((l) => l.slug === level.slug));
+  const introEl = showIntro ? (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="intro-card-title"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 game-no-select"
+      style={{ background: "rgba(0,0,0,0.7)" }}
+      onClick={dismissIntro}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[480px] rounded-md border border-zinc-700 bg-zinc-950 p-6 text-center shadow-2xl sm:p-7"
+        style={{ borderTopColor: level.theme, borderTopWidth: 4 }}
+      >
+        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-500 sm:text-xs">
+          Level {levelIndex + 1} · {level.company}
+        </p>
+        <h2
+          id="intro-card-title"
+          className="mt-3 font-pixel text-base leading-[1.4] text-white sm:text-lg"
+        >
+          PROBLEMS PATROL THIS LEVEL
+        </h2>
+        <p className="mt-4 font-mono text-xs leading-relaxed text-zinc-300 sm:text-sm">
+          Jump on a problem to defeat it. Each defeat unlocks a real solution
+          I shipped.
+        </p>
+        <button
+          type="button"
+          onClick={dismissIntro}
+          className="mt-6 rounded-sm border border-amber-300 bg-amber-300 px-5 py-2 font-pixel text-[10px] uppercase tracking-[0.2em] text-zinc-950 transition hover:bg-amber-200"
+        >
+          Enter Level →
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  // Boss "still fighting" toast — first stomp on the Cars24 boss only.
+  // No auto-dismiss: user closes via ×, backdrop tap, or the CTA. The
+  // mailto CTA is an <a> so iOS Safari treats it as a user-initiated
+  // link; the onClick still runs and dismisses the toast.
+  const bossToastEl = bossToast ? (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="boss-toast-title"
+      className="fixed inset-0 z-40 flex items-start justify-center px-4 pt-6 game-no-select"
+      style={{ background: "rgba(0,0,0,0.5)" }}
+      onClick={dismissBossToast}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full sm:w-[400px]"
+        style={{
+          maxWidth: "calc(100vw - 32px)",
+          animation: bossToastShown
+            ? "lootDropIn 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards"
+            : "lootDropOut 0.3s ease-in forwards",
+          transformOrigin: "top center",
+        }}
+      >
+        <div
+          className="rounded-md border bg-[rgba(15,15,15,0.96)] p-4 shadow-2xl backdrop-blur sm:p-5"
+          style={{ borderColor: "#DC2626" }}
+        >
+          <button
+            type="button"
+            onClick={dismissBossToast}
+            aria-label="Dismiss"
+            className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-md text-base leading-none text-white transition hover:bg-[rgba(255,255,255,0.1)]"
+          >
+            ×
+          </button>
+          <div className="mb-2 flex items-center gap-2 pr-8">
+            <span className="text-red-500" aria-hidden>⚠</span>
+            <span
+              id="boss-toast-title"
+              className="font-pixel text-[11px] uppercase tracking-[0.2em] text-red-400"
+            >
+              Still Fighting This One
+            </span>
+          </div>
+          <div className="space-y-1 font-mono text-xs leading-relaxed text-white sm:text-[13px]">
+            <p>This is the problem I&apos;m solving today.</p>
+            <p>The level after this is up to whoever hires me next.</p>
+          </div>
+          <a
+            href={HIRING_MAILTO}
+            onClick={dismissBossToast}
+            className="mt-4 flex items-center justify-center gap-2 rounded-md px-4 py-2.5 font-pixel text-[11px] uppercase tracking-[0.18em] text-white transition"
+            style={{ background: "#DC2626" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#B91C1C")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#DC2626")}
+          >
+            <span aria-hidden>✉</span>
+            <span>Hiring? Let&apos;s chat →</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // ─── PORTRAIT (touch + portrait): HUD bar / canvas / joystick zone ─────
   if (isTouch && isPortrait) {
     return (
@@ -749,6 +984,9 @@ export default function Game({ level, onLevelComplete }: Props) {
         <div className={`relative bg-black border-t border-white/10 ${noSelect}`} style={{ height: 120 }}>
           <MobileControls onPress={handleMobilePress} />
         </div>
+
+        {introEl}
+        {bossToastEl}
       </div>
     );
   }
@@ -810,6 +1048,9 @@ export default function Game({ level, onLevelComplete }: Props) {
           Arrow keys / A·D to move · ↑ / W / Space to jump
         </p>
       )}
+
+      {introEl}
+      {bossToastEl}
     </div>
   );
 }
@@ -861,13 +1102,27 @@ function drawEnemy(
   ctx: CanvasRenderingContext2D,
   e: EnemyState,
   atlas: HTMLImageElement | null,
-  cameraX: number
+  cameraX: number,
+  now: number
 ) {
-  // Enemy art — drawImage if atlas loaded, else flat rectangle so the
-  // hitbox is still visible during loading.
   const drawSize = e.spriteSize;
   const drawX = e.x + ENEMY_W / 2 - drawSize / 2;
   const drawY = e.y + ENEMY_H - drawSize;
+
+  // Boss aura — pulsing red radial gradient behind the sprite.
+  if (e.isCurrentBattle) {
+    const cx = drawX + drawSize / 2;
+    const cy = drawY + drawSize / 2;
+    const radius = drawSize * 0.7; // 1.4x sprite radius
+    const pulse = 0.4 + Math.sin(now / 200) * 0.2; // 0.2 ↔ 0.6
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    gradient.addColorStop(0, `rgba(220, 38, 38, ${pulse})`);
+    gradient.addColorStop(1, "rgba(220, 38, 38, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+  }
+
+  // Sprite (or rectangle fallback during atlas load).
   if (atlas) {
     const crop = ASSETS.enemySheet.crops[e.spriteKey];
     ctx.drawImage(atlas, crop.sx, crop.sy, crop.sw, crop.sh, drawX, drawY, drawSize, drawSize);
@@ -876,27 +1131,84 @@ function drawEnemy(
     ctx.fillRect(e.x, e.y, ENEMY_W, ENEMY_H);
   }
 
-  // Label pill — opaque black bg, centred on enemy x, white text.
-  // Pill is clamped within the camera viewport so it never gets cropped.
+  // Boss lock icon — top-right corner of sprite.
+  if (e.isCurrentBattle) {
+    drawLockIcon(ctx, drawX + drawSize - 14, drawY + 2, 12);
+  }
+
+  // ─── Label pill(s) — clamped within camera viewport so nothing crops.
   ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const labelMidY = e.y - 18;
-  const tw = ctx.measureText(e.label).width;
-  const padding = 8;
-  const pillW = tw + padding * 2;
-  const pillH = 18;
-  const desiredPillX = e.x + ENEMY_W / 2 - pillW / 2;
-  const minX = cameraX + 4;
-  const maxX = cameraX + CANVAS_W - 4 - pillW;
-  const pillX = Math.round(clamp(desiredPillX, minX, maxX));
-  const pillY = Math.round(labelMidY - pillH / 2);
-  ctx.fillStyle = "rgba(0,0,0,0.85)";
-  ctx.fillRect(pillX, pillY, pillW, pillH);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(e.label, pillX + pillW / 2, labelMidY + 0.5);
+
+  const drawPill = (
+    text: string,
+    midY: number,
+    bg: string,
+    fg: string,
+    border?: string
+  ) => {
+    const tw = ctx.measureText(text).width;
+    const padding = 8;
+    const pillW = tw + padding * 2;
+    const pillH = 18;
+    const desiredX = e.x + ENEMY_W / 2 - pillW / 2;
+    const minX = cameraX + 4;
+    const maxX = cameraX + CANVAS_W - 4 - pillW;
+    const pillX = Math.round(clamp(desiredX, minX, maxX));
+    const pillY = Math.round(midY - pillH / 2);
+    ctx.fillStyle = bg;
+    ctx.fillRect(pillX, pillY, pillW, pillH);
+    if (border) {
+      ctx.strokeStyle = border;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(pillX + 0.5, pillY + 0.5, pillW - 1, pillH - 1);
+    }
+    ctx.fillStyle = fg;
+    ctx.fillText(text, pillX + pillW / 2, midY + 0.5);
+  };
+
+  if (e.isCurrentBattle) {
+    // Top: BOSS pill (red).
+    drawPill("BOSS · STILL ALIVE", drawY - 22, "rgba(127,29,29,0.95)", "#FFFFFF", "#DC2626");
+    // Below sprite: small muted problem-name pill.
+    drawPill(e.label, drawY + drawSize + 14, "rgba(0,0,0,0.7)", "#cbd5e1");
+  } else {
+    drawPill(`PROBLEM: ${e.label}`, e.y - 18, "rgba(0,0,0,0.85)", "#FFFFFF");
+  }
+
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
+}
+
+// Tiny pixel padlock — drawn with rectangles. Red body, white shackle.
+function drawLockIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number
+) {
+  const bodyH = Math.round(size * 0.6);
+  const bodyY = y + size - bodyH;
+  // White outline ring around body
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(x - 1, bodyY - 1, size + 2, bodyH + 2);
+  // Red body
+  ctx.fillStyle = "#DC2626";
+  ctx.fillRect(x, bodyY, size, bodyH);
+  // Shackle — three rectangles approximating a U-shape, white outlined
+  const shackleH = Math.round(size * 0.55);
+  const shackleW = Math.round(size * 0.65);
+  const shackleX = x + Math.round((size - shackleW) / 2);
+  const shackleY = y;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(shackleX - 1, shackleY - 1, shackleW + 2, 3);
+  ctx.fillRect(shackleX - 1, shackleY - 1, 3, shackleH);
+  ctx.fillRect(shackleX + shackleW - 2, shackleY - 1, 3, shackleH);
+  ctx.fillStyle = "#DC2626";
+  ctx.fillRect(shackleX, shackleY, shackleW, 1);
+  ctx.fillRect(shackleX, shackleY, 1, shackleH - 1);
+  ctx.fillRect(shackleX + shackleW - 1, shackleY, 1, shackleH - 1);
 }
 
 function drawTutorialHint(
