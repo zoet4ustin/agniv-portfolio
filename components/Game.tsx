@@ -108,7 +108,6 @@ type TutorialState = {
 const TUTORIAL_LS_KEY = "tutorialShown";
 
 export default function Game({ level, onLevelComplete }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [solutions, setSolutions] = useState(0);
   const [toast, setToast] = useState<ToastPayload | null>(null);
   const [toastShown, setToastShown] = useState(false);
@@ -117,7 +116,16 @@ export default function Game({ level, onLevelComplete }: Props) {
   const [levelCompleted, setLevelCompleted] = useState(false);
   const [isTouch, setIsTouch] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
-  const [bannerDismissed, setBannerDismissed] = useState(true);
+  // Banner is per-mount: navigating away and back re-shows it.
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  // Canvas is referenced via state + callback ref so the game loop's
+  // useEffect re-runs (and re-attaches its rAF + 2d context) whenever the
+  // canvas DOM node changes — e.g. when the layout flips between portrait
+  // and landscape branches and React remounts the element.
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
+  const canvasRefCallback = useCallback((node: HTMLCanvasElement | null) => {
+    setCanvasEl(node);
+  }, []);
 
   const keysRef = useRef<Keys>({
     left: false,
@@ -182,19 +190,10 @@ export default function Game({ level, onLevelComplete }: Props) {
     };
   }, []);
 
-  // Portrait banner: visible on touch+portrait until user dismisses (persisted).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const seen = window.localStorage.getItem("portraitBannerDismissed") === "true";
-    setBannerDismissed(seen);
-  }, []);
+  // Portrait banner: per-mount only — no persistence. Navigating away and
+  // back re-mounts the component and the banner reappears.
   const dismissBanner = useCallback(() => {
     setBannerDismissed(true);
-    try {
-      window.localStorage.setItem("portraitBannerDismissed", "true");
-    } catch {
-      // ignore
-    }
   }, []);
 
   // Keyboard
@@ -260,11 +259,13 @@ export default function Game({ level, onLevelComplete }: Props) {
     []
   );
 
-  // Game loop
+  // Game loop. Re-runs whenever the canvas element itself changes, so a
+  // layout swap that remounts the canvas cleanly tears down the old rAF
+  // and attaches a fresh one to the new node. Game state lives in
+  // stateRef and survives the swap.
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    if (!canvasEl) return;
+    const ctx = canvasEl.getContext("2d");
     if (!ctx) return;
 
     const sprites: Record<PlayerAnim, AnimatedSprite> = {
@@ -593,7 +594,7 @@ export default function Game({ level, onLevelComplete }: Props) {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (toastHideTimerRef.current) clearTimeout(toastHideTimerRef.current);
     };
-  }, [level, showToast]);
+  }, [canvasEl, level, showToast]);
 
   const handleMobilePress = useCallback((key: MobileKey, down: boolean) => {
     if (key === "left") keysRef.current.left = down;
@@ -607,11 +608,11 @@ export default function Game({ level, onLevelComplete }: Props) {
   const noSelect = "game-no-select";
   const showBanner = isTouch && isPortrait && !bannerDismissed;
 
-  // Reusable canvas element — same DOM node for every layout (so the ref +
-  // game loop don't need to re-mount when orientation flips).
+  // Reusable canvas element — uses the callback ref so the game loop's
+  // useEffect re-runs if React remounts the element across layout swaps.
   const canvasNode = (className: string, extraStyle?: React.CSSProperties) => (
     <canvas
-      ref={canvasRef}
+      ref={canvasRefCallback}
       width={CANVAS_W}
       height={CANVAS_H}
       tabIndex={0}
@@ -725,17 +726,21 @@ export default function Game({ level, onLevelComplete }: Props) {
           </div>
         )}
 
-        {/* Canvas zone */}
-        <div className={`relative flex-1 overflow-hidden bg-black ${noSelect}`}>
+        {/* Canvas zone — flex-1 with explicit min-height so it always has
+            a real height inside the column, even before children fill in.
+            Canvas fills the zone with object-contain so the 2:1 game
+            content letterboxes neatly when the zone is taller than wide
+            (which is common in portrait). */}
+        <div
+          className={`relative flex-1 overflow-hidden bg-black ${noSelect}`}
+          style={{ minHeight: 200 }}
+        >
           <div
             className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1"
             style={{ background: level.theme }}
             aria-hidden
           />
-          {canvasNode(
-            "absolute inset-0 m-auto block max-h-full max-w-full",
-            { aspectRatio: "2 / 1" }
-          )}
+          {canvasNode("absolute inset-0 block h-full w-full object-contain")}
           {toastEl}
           {chipEl}
         </div>
