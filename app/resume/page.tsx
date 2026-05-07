@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { contact } from "@/lib/contact";
+import { CONTACT } from "@/lib/contact";
 
 export default function ResumePage() {
   // Make device-back land on /#chapters even when /resume was a deep link.
@@ -49,19 +49,22 @@ export default function ResumePage() {
             Product Leader · Consumer Fintech, E-commerce, AI Platforms
           </p>
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-zinc-400">
-            <a href={`mailto:${contact.email}`} className="hover:text-white">
-              {contact.email}
+            <a
+              href={`mailto:${CONTACT.channels.email}`}
+              className="hover:text-white"
+            >
+              {CONTACT.channels.email}
             </a>
             <a
-              href={contact.linkedin}
+              href={CONTACT.channels.linkedin}
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-white"
             >
               LinkedIn
             </a>
-            <span>{contact.phone}</span>
-            <span>{contact.location}</span>
+            <span>+91 91130 49917</span>
+            <span>{CONTACT.location}</span>
           </div>
         </header>
 

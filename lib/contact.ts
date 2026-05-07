@@ -1,16 +1,18 @@
-export type Contact = {
-  email: string;
-  linkedin: string;
-  phone: string;
-  location: string;
-  portfolio: string;
-};
+export const CONTACT = {
+  name: "Agniv Kashyap",
+  role: "Product Leader",
+  currentCompany: "AVP Product at Cars24",
+  location: "New Delhi, India",
 
-export const contact: Contact = {
-  email: "connect.agnivkashyap@gmail.com",
-  linkedin: "https://www.linkedin.com/in/connectagniv/",
-  phone: "+91 91130 49917",
-  location: "Delhi, India",
-  portfolio:
-    "https://hello-from-agniv.notion.site/From-Problems-to-Products-26e5e8f36e5c80fe9887eff5b2bc6621",
-};
+  pitchLine:
+    "I work best on hard, ambiguous user problems. Real work, clear metrics, P&L to grow. 0-to-1, problems shaped to product. If you're building something like that, let's talk.",
+
+  channels: {
+    email: "connect.agnivkashyap@gmail.com",
+    linkedin: "https://www.linkedin.com/in/connectagniv/",
+    github: "https://github.com/zoet4ustin",
+    instagram: "https://www.instagram.com/agnivkashyap",
+    // E.164, used for clipboard copy. Display formatting handled in UI.
+    phone: "+919113049917",
+  },
+} as const;

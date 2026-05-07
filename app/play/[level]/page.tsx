@@ -2,10 +2,9 @@ import Link from "next/link";
 import { getLevel } from "@/lib/levels";
 import PlayClient from "./PlayClient";
 
-// "skills" has its own static route at app/play/skills/page.tsx, so the
-// dynamic route only needs to handle "contact" as a known-bonus stub.
-const KNOWN_BONUS = new Set(["contact"]);
-
+// /play/skills and /play/contact are handled by their own static routes
+// alongside this dynamic one. Anything that isn't a real Level slug just
+// 404s.
 export default async function PlayLevelPage({
   params,
 }: {
@@ -18,20 +17,10 @@ export default async function PlayLevelPage({
     return <PlayClient level={level} />;
   }
 
-  if (KNOWN_BONUS.has(slug)) {
-    return (
-      <ComingSoonGeneric
-        title="Contact"
-        subtitle="Bonus stage · coming soon"
-        theme="#F59E0B"
-      />
-    );
-  }
-
   return <NotFound slug={slug} />;
 }
 
-function PageShell({ children }: { children: React.ReactNode }) {
+function NotFound({ slug }: { slug: string }) {
   return (
     <div className="relative min-h-screen w-full bg-zinc-950 text-zinc-100">
       <div
@@ -44,62 +33,22 @@ function PageShell({ children }: { children: React.ReactNode }) {
         aria-hidden
       />
       <main className="relative z-0 mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center px-6 py-24 text-center">
-        {children}
+        <p className="mb-3 font-mono text-xs uppercase tracking-[0.4em] text-red-400">
+          404
+        </p>
+        <h1 className="mb-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+          Level not found
+        </h1>
+        <p className="mb-10 font-mono text-sm text-zinc-400">
+          No level matches “{slug}”.
+        </p>
+        <Link
+          href="/"
+          className="rounded-md border border-zinc-700 bg-zinc-900/80 px-4 py-2 font-mono text-xs uppercase tracking-widest text-zinc-300 transition hover:border-zinc-500 hover:text-white"
+        >
+          ← Back to World Map
+        </Link>
       </main>
     </div>
-  );
-}
-
-function ComingSoonGeneric({
-  title,
-  subtitle,
-  theme,
-}: {
-  title: string;
-  subtitle: string;
-  theme: string;
-}) {
-  return (
-    <PageShell>
-      <div
-        className="mb-8 h-32 w-full max-w-md rounded-lg border border-black/30"
-        style={{ background: theme }}
-        aria-hidden
-      />
-      <p className="mb-3 font-mono text-xs uppercase tracking-[0.4em] text-zinc-500">
-        {subtitle}
-      </p>
-      <h1 className="mb-10 text-4xl font-black tracking-tight text-white sm:text-5xl">
-        {title}
-      </h1>
-      <Link
-        href="/"
-        className="rounded-md border border-zinc-700 bg-zinc-900/80 px-4 py-2 font-mono text-xs uppercase tracking-widest text-zinc-300 transition hover:border-zinc-500 hover:text-white"
-      >
-        ← Back to World Map
-      </Link>
-    </PageShell>
-  );
-}
-
-function NotFound({ slug }: { slug: string }) {
-  return (
-    <PageShell>
-      <p className="mb-3 font-mono text-xs uppercase tracking-[0.4em] text-red-400">
-        404
-      </p>
-      <h1 className="mb-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-        Level not found
-      </h1>
-      <p className="mb-10 font-mono text-sm text-zinc-400">
-        No level matches “{slug}”.
-      </p>
-      <Link
-        href="/"
-        className="rounded-md border border-zinc-700 bg-zinc-900/80 px-4 py-2 font-mono text-xs uppercase tracking-widest text-zinc-300 transition hover:border-zinc-500 hover:text-white"
-      >
-        ← Back to World Map
-      </Link>
-    </PageShell>
   );
 }

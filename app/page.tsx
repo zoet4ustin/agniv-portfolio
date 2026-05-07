@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { levels } from "@/lib/levels";
-import { contact } from "@/lib/contact";
 
 const TEASERS: Record<string, string> = {
   flipkart: "fraud, at the scale of a billion users",
@@ -242,37 +241,27 @@ function LevelMap() {
             </div>
           </Link>
 
-          <div className="flex items-center gap-4 rounded-md border border-zinc-800 bg-zinc-900/60 p-5 transition hover:border-amber-400/60">
+          <Link
+            href="/play/contact"
+            className="group flex items-center gap-4 rounded-md border border-zinc-800 bg-zinc-900/60 p-5 transition hover:-translate-y-0.5 hover:border-amber-400/60 hover:bg-zinc-900"
+          >
             <div
               className="h-12 w-12 shrink-0 rounded-sm border border-black/30"
               style={{ background: "#F59E0B" }}
               aria-hidden
             />
-            <div className="flex-1">
+            <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-500">
-                End Boss · You
+                Bonus Stage
               </div>
               <div className="font-pixel text-sm text-white sm:text-base">
-                Get In Touch
+                Get in touch
               </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px]">
-                <a
-                  href={`mailto:${contact.email}`}
-                  className="text-amber-300 underline-offset-4 hover:underline"
-                >
-                  {contact.email}
-                </a>
-                <a
-                  href={contact.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-zinc-300 underline-offset-4 hover:underline"
-                >
-                  LinkedIn
-                </a>
+              <div className="mt-1 font-mono text-[11px] text-zinc-400">
+                Always available
               </div>
             </div>
-          </div>
+          </Link>
         </div>
       </div>
     </section>
