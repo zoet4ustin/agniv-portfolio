@@ -6,7 +6,6 @@ import Link from "next/link";
 import { CONTACT } from "@/lib/contact";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 
-const PHONE_DISPLAY = "+91 91130 49917";
 const EMAIL_SUBJECT = "Hello Agniv";
 const GMAIL_COMPOSE = (() => {
   const subject = encodeURIComponent(EMAIL_SUBJECT);
@@ -73,10 +72,7 @@ export default function ContactExhibit() {
 
   const onPhoneClick = useCallback(async () => {
     const ok = await copy(CONTACT.channels.phone);
-    flash(
-      "phone",
-      ok ? "✓ Copied — please email first" : "Couldn't copy — long-press above"
-    );
+    flash("phone", ok ? "✓ Copied" : "Couldn't copy — please email or DM");
   }, [copy, flash]);
 
   // Twinkling background — same shape as the constellation page.
@@ -139,28 +135,14 @@ export default function ContactExhibit() {
             {CONTACT.role} · {CONTACT.currentCompany}
           </p>
           <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-xs text-zinc-400">
-            <span aria-hidden>📍</span>
+            <PinIcon />
             {CONTACT.location}
           </span>
         </header>
 
         {/* PITCH BLOCK */}
-        <section className="relative mx-auto mt-14 max-w-[540px] px-6 text-center sm:mt-16">
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -left-2 -top-10 select-none font-pixel text-[120px] leading-none text-white sm:-left-6 sm:-top-12 sm:text-[160px]"
-            style={{ opacity: 0.06 }}
-          >
-            “
-          </span>
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -bottom-20 -right-2 select-none font-pixel text-[120px] leading-none text-white sm:-bottom-24 sm:-right-6 sm:text-[160px]"
-            style={{ opacity: 0.06 }}
-          >
-            ”
-          </span>
-          <p className="relative font-mono leading-[1.7] text-zinc-200 text-[15px] sm:text-[17px]">
+        <section className="mx-auto mt-14 max-w-[540px] px-6 text-center sm:mt-16">
+          <p className="font-mono leading-[1.7] text-zinc-200 text-[15px] sm:text-[17px]">
             {CONTACT.pitchLine}
           </p>
         </section>
@@ -211,30 +193,53 @@ export default function ContactExhibit() {
             secondary="where the travel + photography lives"
           />
 
-          {/* Phone — copy only, no tel: dialer */}
+          {/* Phone — copy only, no tel: dialer. Digits never appear in
+              the rendered HTML; they only travel from CONTACT.channels.phone
+              into the clipboard inside onPhoneClick. */}
           <ChannelCard
             as="button"
             onClick={onPhoneClick}
             icon={<PhoneIcon />}
             label="Phone"
-            sub={PHONE_DISPLAY}
-            secondary="Tap to copy. Please email or DM first."
+            sub="Tap to copy phone number"
             confirmation={
               confirmation?.key === "phone" ? confirmation.message : null
             }
           />
         </section>
 
-        {/* SIGN-OFF */}
-        <footer className="mt-20 text-center">
+        {/* RESUME CTA — visually distinct from the channel cards */}
+        <div className="mt-6 flex justify-center">
           <Link
             href="/resume"
-            className="font-mono text-xs text-zinc-400 underline-offset-4 transition hover:text-white hover:underline"
+            className="group flex w-full items-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-6 py-4 text-left transition hover:bg-white/[0.10] focus:outline-none focus:ring-2 focus:ring-white/20 sm:w-[320px]"
           >
-            Resume → /resume
+            <span className="shrink-0 text-white/80 transition group-hover:text-white">
+              <ResumeIcon />
+            </span>
+            <span className="flex-1 font-mono text-[14px] text-white">
+              Read my resume
+            </span>
+            <span className="font-mono text-white/60 transition group-hover:text-white">
+              →
+            </span>
           </Link>
-          <p className="mt-3 font-mono text-[10px] text-zinc-600">
-            Built with Claude. Played with care.
+        </div>
+
+        {/* SIGN-OFF — Reid Hoffman quote */}
+        <footer className="mx-auto mt-8 max-w-[480px] text-center">
+          <p
+            className="font-mono italic leading-[1.6] text-zinc-200"
+            style={{ fontSize: 13, opacity: 0.65 }}
+          >
+            “If you are not embarrassed by the first version of your product,
+            you&apos;ve launched too late.”
+          </p>
+          <p
+            className="mt-2 font-mono text-zinc-300"
+            style={{ fontSize: 12, opacity: 0.45 }}
+          >
+            — Reid Hoffman
           </p>
         </footer>
       </main>
@@ -360,6 +365,26 @@ function PhoneIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function ResumeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M8 13h8" />
+      <path d="M8 17h6" />
     </svg>
   );
 }

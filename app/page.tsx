@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import AboutLogo from "@/components/AboutLogo";
 import { levels } from "@/lib/levels";
 
 const TEASERS: Record<string, string> = {
@@ -74,6 +75,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-full bg-zinc-950 text-zinc-100">
+      <AboutLogo />
+
       <Link
         href="/resume"
         className="fixed right-4 top-4 z-50 rounded-md border border-white/15 bg-black/55 px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest text-zinc-300 backdrop-blur transition hover:border-white/40 hover:text-white sm:right-6 sm:top-6"
