@@ -91,7 +91,10 @@ const CONSTELLATION_LINES: [string, string][] = [
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 2.5;
 const DEFAULT_ZOOM = 1;
+const DEFAULT_PAN = { x: 0, y: 0 };
 const FRAME_PADDING = 56; // breathing room around the auto-fit constellation
+const PAN_OVERSCROLL = 0.2; // how much past the edge users can drag (% of viewport)
+const SKILL_TARGET_ATTR = "data-skill-target";
 
 // ─── Component ─────────────────────────────────────────────────────────
 
@@ -104,6 +107,8 @@ export default function SkillsConstellation() {
 
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [fitScale, setFitScale] = useState(1);
+  const [pan, setPan] = useState(DEFAULT_PAN);
+  const [isDragging, setIsDragging] = useState(false);
   const [openSkill, setOpenSkill] = useState<Skill | null>(null);
   const [inspected, setInspected] = useState<Set<string>>(new Set());
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -112,6 +117,30 @@ export default function SkillsConstellation() {
 
   const frameRef = useRef<HTMLDivElement>(null);
   const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    startPan: { x: number; y: number };
+  } | null>(null);
+
+  // Refs mirror state so pointer/wheel handlers (attached once) can read
+  // current values without re-attaching on every state change.
+  const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
+  const fitScaleRef = useRef(fitScale);
+  const layoutRef = useRef(layout);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+  useEffect(() => {
+    fitScaleRef.current = fitScale;
+  }, [fitScale]);
+  useEffect(() => {
+    layoutRef.current = layout;
+  }, [layout]);
 
   const skillById = useMemo(() => {
     const m = new Map<string, Skill>();
@@ -162,23 +191,89 @@ export default function SkillsConstellation() {
     () => setZoom((z) => Math.max(MIN_ZOOM, Math.round((z - 0.2) * 100) / 100)),
     []
   );
-  const zoomReset = useCallback(() => setZoom(DEFAULT_ZOOM), []);
+  const zoomReset = useCallback(() => {
+    setZoom(DEFAULT_ZOOM);
+    setPan(DEFAULT_PAN);
+  }, []);
 
-  // Ctrl/Cmd + wheel = zoom on desktop.
+  // Soft pan boundaries — limit so at least the center of the constellation
+  // stays near the viewport. Reads scale via refs so drag-time updates use
+  // the latest zoom/fit values.
+  const computePanBounds = useCallback(() => {
+    const frame = frameRef.current;
+    if (!frame) return { xMax: 0, yMax: 0 };
+    const rect = frame.getBoundingClientRect();
+    const scale = fitScaleRef.current * zoomRef.current;
+    const dispW = layoutRef.current.width * scale;
+    const dispH = layoutRef.current.height * scale;
+    const xMax = Math.max(0, (dispW - rect.width) / 2) + rect.width * PAN_OVERSCROLL;
+    const yMax = Math.max(0, (dispH - rect.height) / 2) + rect.height * PAN_OVERSCROLL;
+    return { xMax, yMax };
+  }, []);
+
+  const clampPan = useCallback(
+    (p: { x: number; y: number }) => {
+      const { xMax, yMax } = computePanBounds();
+      return { x: clamp(p.x, -xMax, xMax), y: clamp(p.y, -yMax, yMax) };
+    },
+    [computePanBounds]
+  );
+
+  // Whenever the display scale changes, re-clamp the existing pan so we
+  // don't get stuck outside the new bounds (e.g., zoom out → bounds shrink).
+  useEffect(() => {
+    setPan((p) => clampPan(p));
+  }, [zoom, fitScale, layout, clampPan]);
+
+  // Mouse drag → pan. Listeners on the frame for mousedown, on window for
+  // move/up so the drag survives leaving the element.
   useEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return;
-      e.preventDefault();
-      const delta = -e.deltaY * 0.0015;
-      setZoom((z) => clamp(z + delta, MIN_ZOOM, MAX_ZOOM));
-    };
-    frame.addEventListener("wheel", onWheel, { passive: false });
-    return () => frame.removeEventListener("wheel", onWheel);
-  }, []);
 
-  // Two-finger pinch zoom on mobile.
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as Element | null;
+      if (target?.closest?.(`[${SKILL_TARGET_ATTR}]`)) return;
+      dragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startPan: { ...panRef.current },
+      };
+      setIsDragging(true);
+      e.preventDefault();
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      setPan(
+        clampPan({
+          x: dragRef.current.startPan.x + dx,
+          y: dragRef.current.startPan.y + dy,
+        })
+      );
+    };
+
+    const onMouseUp = () => {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      setIsDragging(false);
+    };
+
+    frame.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      frame.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [clampPan]);
+
+  // Touch — single-finger pan, two-finger pinch zoom. Both share dragRef
+  // and pinchRef so they don't fight each other.
   useEffect(() => {
     const frame = frameRef.current;
     if (!frame) return;
@@ -186,35 +281,89 @@ export default function SkillsConstellation() {
       Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
 
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const target = t.target as Element | null;
+        if (target?.closest?.(`[${SKILL_TARGET_ATTR}]`)) return;
+        dragRef.current = {
+          startX: t.clientX,
+          startY: t.clientY,
+          startPan: { ...panRef.current },
+        };
+        setIsDragging(true);
+        e.preventDefault();
+      } else if (e.touches.length === 2) {
         pinchRef.current = {
           dist: dist(e.touches[0], e.touches[1]),
-          zoom,
+          zoom: zoomRef.current,
         };
+        // Cancel any in-flight pan so it doesn't fight the pinch.
+        dragRef.current = null;
+        setIsDragging(false);
         e.preventDefault();
       }
     };
+
     const onTouchMove = (e: TouchEvent) => {
-      if (pinchRef.current && e.touches.length === 2) {
+      if (dragRef.current && e.touches.length === 1) {
+        const t = e.touches[0];
+        const dx = t.clientX - dragRef.current.startX;
+        const dy = t.clientY - dragRef.current.startY;
+        setPan(
+          clampPan({
+            x: dragRef.current.startPan.x + dx,
+            y: dragRef.current.startPan.y + dy,
+          })
+        );
+        e.preventDefault();
+      } else if (pinchRef.current && e.touches.length === 2) {
         const d = dist(e.touches[0], e.touches[1]);
         const factor = d / pinchRef.current.dist;
         setZoom(clamp(pinchRef.current.zoom * factor, MIN_ZOOM, MAX_ZOOM));
         e.preventDefault();
       }
     };
+
     const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) {
+        dragRef.current = null;
+        setIsDragging(false);
+      }
       if (e.touches.length < 2) pinchRef.current = null;
     };
 
     frame.addEventListener("touchstart", onTouchStart, { passive: false });
     frame.addEventListener("touchmove", onTouchMove, { passive: false });
     frame.addEventListener("touchend", onTouchEnd);
+    frame.addEventListener("touchcancel", onTouchEnd);
     return () => {
       frame.removeEventListener("touchstart", onTouchStart);
       frame.removeEventListener("touchmove", onTouchMove);
       frame.removeEventListener("touchend", onTouchEnd);
+      frame.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [zoom]);
+  }, [clampPan]);
+
+  // Wheel — Ctrl/Cmd zooms; otherwise pan by deltaX/deltaY (trackpad
+  // two-finger swipe, plain wheel scroll).
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = -e.deltaY * 0.0015;
+        setZoom((z) => clamp(z + delta, MIN_ZOOM, MAX_ZOOM));
+      } else {
+        e.preventDefault();
+        setPan((p) =>
+          clampPan({ x: p.x - e.deltaX, y: p.y - e.deltaY })
+        );
+      }
+    };
+    frame.addEventListener("wheel", onWheel, { passive: false });
+    return () => frame.removeEventListener("wheel", onWheel);
+  }, [clampPan]);
 
   // Keyboard navigation: arrow keys move focus to the nearest star in
   // that direction; Enter opens the popup.
@@ -278,10 +427,12 @@ export default function SkillsConstellation() {
 
   const allInspected = inspected.size === SKILLS.length;
   const displayScale = fitScale * zoom;
-  const transitionStyle =
-    pinchRef.current === null
-      ? "transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)"
-      : "none";
+  // Disable transitions during any active interaction so the constellation
+  // tracks the cursor/finger 1:1; keep them on for button-driven changes.
+  const interacting = isDragging || pinchRef.current !== null;
+  const transitionStyle = interacting
+    ? "none"
+    : "transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)";
 
   return (
     <div
@@ -331,15 +482,17 @@ export default function SkillsConstellation() {
       {/* Constellation frame */}
       <div
         ref={frameRef}
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ touchAction: "pan-y" }}
+        className={`absolute inset-0 flex items-center justify-center ${
+          isDragging ? "cursor-grabbing" : "cursor-grab"
+        }`}
+        style={{ touchAction: "none" }}
       >
         <div
           className="relative"
           style={{
             width: layout.width,
             height: layout.height,
-            transform: `scale(${displayScale})`,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${displayScale})`,
             transformOrigin: "center center",
             transition: transitionStyle,
           }}
@@ -408,6 +561,7 @@ export default function SkillsConstellation() {
                   role="button"
                   tabIndex={0}
                   aria-label={`Inspect ${skill.name}`}
+                  data-skill-target="true"
                   className="cursor-pointer outline-none"
                   style={{
                     animation: isHot
@@ -482,6 +636,7 @@ export default function SkillsConstellation() {
                 onMouseLeave={() =>
                   setHoveredId((id) => (id === skill.id ? null : id))
                 }
+                data-skill-target="true"
                 className="absolute font-mono leading-tight text-center cursor-pointer outline-none whitespace-nowrap game-no-select"
                 style={{
                   left: pos.x,
