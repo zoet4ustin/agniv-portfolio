@@ -38,16 +38,29 @@ const TUTORIAL_DURATION_MS = 5000;
 const INTRO_AUTO_DISMISS_MS = 4000;
 const MOBILE_VERTICAL_SHIFT = 40; // shift world up on mobile so action sits above touch buttons
 
-const TUTORIAL_SS_KEY = "tutorial_hint_shown";
-const BOSS_TOAST_SS_KEY = "boss_toast_shown_cars24";
-const introSsKey = (slug: string) => `level_intro_shown_${slug}`;
+// One-time UX is persisted in localStorage so it survives tab close.
+const TUTORIAL_LS_KEY = "agniv_tutorial_jump_seen";
+const BOSS_TOAST_LS_KEY = "agniv_boss_toast_seen";
+const introLsKey = (slug: string) => `agniv_intro_seen_${slug}`;
+
+const HIRING_EMAIL = "connect.agnivkashyap@gmail.com";
+const HIRING_SUBJECT = "Hiring conversation";
+const HIRING_BODY =
+  "Hi Agniv,\n\nI played your portfolio and want to talk about a role.\n\n";
+const HIRING_LINKEDIN = "https://www.linkedin.com/in/connectagniv/";
 
 const HIRING_MAILTO = (() => {
-  const subject = encodeURIComponent("Hiring conversation");
-  const body = encodeURIComponent(
-    "Hi Agniv,\r\n\r\nI played your portfolio and want to talk about a role.\r\n\r\n"
-  );
-  return `mailto:connect.agnivkashyap@gmail.com?subject=${subject}&body=${body}`;
+  const subject = encodeURIComponent(HIRING_SUBJECT);
+  const body = encodeURIComponent(HIRING_BODY);
+  return `mailto:${HIRING_EMAIL}?subject=${subject}&body=${body}`;
+})();
+
+const HIRING_GMAIL_COMPOSE = (() => {
+  const subject = encodeURIComponent(HIRING_SUBJECT);
+  const body = encodeURIComponent(HIRING_BODY);
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+    HIRING_EMAIL
+  )}&su=${subject}&body=${body}`;
 })();
 
 type EnemyState = {
@@ -127,6 +140,9 @@ export default function Game({ level, onLevelComplete }: Props) {
   const [latestSolution, setLatestSolution] = useState<ToastPayload | null>(null);
   const [chipKey, setChipKey] = useState(0);
   const [levelCompleted, setLevelCompleted] = useState(false);
+  // "Copied!" feedback for the boss toast's contact menu.
+  const [emailCopied, setEmailCopied] = useState(false);
+  const emailCopiedTimerRef = useRef<number | null>(null);
   const [isTouch, setIsTouch] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
   // Banner is per-mount: navigating away and back re-shows it.
@@ -185,11 +201,16 @@ export default function Game({ level, onLevelComplete }: Props) {
     onCompleteRef.current = onLevelComplete;
   }, [onLevelComplete]);
 
-  // Tutorial hint is level-agnostic: shown once per session, on the first
-  // regular (non-boss) enemy the player approaches in any level.
+  // Tutorial hint is level-agnostic and persisted in localStorage so it
+  // never re-appears once seen, even after closing the tab.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const seen = window.sessionStorage.getItem(TUTORIAL_SS_KEY) === "true";
+    let seen = false;
+    try {
+      seen = window.localStorage.getItem(TUTORIAL_LS_KEY) === "true";
+    } catch {
+      // ignore
+    }
     tutorialRef.current = { enemyId: null, shownAt: 0, dismissed: seen };
   }, [level.slug]);
 
@@ -218,27 +239,32 @@ export default function Game({ level, onLevelComplete }: Props) {
     setBannerDismissed(true);
   }, []);
 
-  // Intro card — show once per level per session. Pauses physics + input
-  // while visible.
+  // Intro card — once per level, ever (localStorage). Pauses physics + input
+  // while visible. Flag is set the moment the card is shown, so navigating
+  // away mid-display still counts as "seen".
   useEffect(() => {
     if (typeof window === "undefined") return;
     let seen = false;
     try {
-      seen = window.sessionStorage.getItem(introSsKey(level.slug)) === "true";
+      seen = window.localStorage.getItem(introLsKey(level.slug)) === "true";
     } catch {
       // ignore
     }
-    setShowIntro(!seen);
+    if (!seen) {
+      setShowIntro(true);
+      try {
+        window.localStorage.setItem(introLsKey(level.slug), "true");
+      } catch {
+        // ignore
+      }
+    } else {
+      setShowIntro(false);
+    }
   }, [level.slug]);
 
   const dismissIntro = useCallback(() => {
     setShowIntro(false);
-    try {
-      window.sessionStorage.setItem(introSsKey(level.slug), "true");
-    } catch {
-      // ignore
-    }
-  }, [level.slug]);
+  }, []);
 
   // Auto-dismiss the intro card.
   useEffect(() => {
@@ -265,24 +291,30 @@ export default function Game({ level, onLevelComplete }: Props) {
     pausedRef.current = showIntro;
   }, [showIntro]);
 
-  // Boss toast — check session flag once per mount.
+  // Boss toast — persistent localStorage flag, checked once per mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       bossToastSessionRef.current =
-        window.sessionStorage.getItem(BOSS_TOAST_SS_KEY) === "true";
+        window.localStorage.getItem(BOSS_TOAST_LS_KEY) === "true";
     } catch {
       bossToastSessionRef.current = false;
     }
   }, []);
 
   // Boss toast stays open until the user explicitly dismisses it
-  // (× button, backdrop click, or CTA tap). No auto-dismiss — this is a
-  // conversion moment, not a passing notification.
+  // (× button, backdrop click, or contact-menu action). No auto-dismiss —
+  // this is a conversion moment, not a passing notification. Flag is
+  // written the moment the toast is triggered.
   const triggerBossToast = useCallback(() => {
     if (bossToastHideTimerRef.current) clearTimeout(bossToastHideTimerRef.current);
     setBossToast(true);
     setBossToastShown(false);
+    try {
+      window.localStorage.setItem(BOSS_TOAST_LS_KEY, "true");
+    } catch {
+      // ignore
+    }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => setBossToastShown(true));
     });
@@ -295,6 +327,45 @@ export default function Game({ level, onLevelComplete }: Props) {
     bossToastHideTimerRef.current = window.setTimeout(() => {
       setBossToast(false);
     }, 320);
+  }, []);
+
+  // Email — desktop opens Gmail compose in a new tab (most desktop users
+  // don't have a default mail client). Mobile lets the <a href="mailto:">
+  // do its job; iOS Safari requires a real link, not a JS-triggered nav.
+  const handleEmailClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (!isTouchRef.current) {
+        e.preventDefault();
+        window.open(HIRING_GMAIL_COMPOSE, "_blank", "noopener,noreferrer");
+      }
+      dismissBossToast();
+    },
+    [dismissBossToast]
+  );
+
+  const handleCopyEmail = useCallback(async () => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(HIRING_EMAIL);
+      } else {
+        // Legacy fallback for browsers without async clipboard API.
+        const ta = document.createElement("textarea");
+        ta.value = HIRING_EMAIL;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setEmailCopied(true);
+      if (emailCopiedTimerRef.current) clearTimeout(emailCopiedTimerRef.current);
+      emailCopiedTimerRef.current = window.setTimeout(() => {
+        setEmailCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error("[Game] clipboard write failed", err);
+    }
   }, []);
 
   // Keyboard
@@ -493,11 +564,6 @@ export default function Game({ level, onLevelComplete }: Props) {
             // this session.
             if (!bossToastSessionRef.current && level.slug === "cars24") {
               bossToastSessionRef.current = true;
-              try {
-                window.sessionStorage.setItem(BOSS_TOAST_SS_KEY, "true");
-              } catch {
-                // ignore
-              }
               triggerBossToast();
             }
           }
@@ -515,7 +581,7 @@ export default function Game({ level, onLevelComplete }: Props) {
             tutorialRef.current.dismissed = true;
             tutorialRef.current.enemyId = null;
             try {
-              window.sessionStorage.setItem(TUTORIAL_SS_KEY, "true");
+              window.localStorage.setItem(TUTORIAL_LS_KEY, "true");
             } catch {
               // ignore — incognito or storage disabled
             }
@@ -530,6 +596,8 @@ export default function Game({ level, onLevelComplete }: Props) {
       }
 
       // Tutorial trigger — any level, first non-boss enemy within range.
+      // Mark seen IMMEDIATELY so the flag persists even if the user
+      // navigates away mid-display.
       if (!tutorialRef.current.dismissed && !tutorialRef.current.enemyId) {
         for (const e of s.enemies) {
           if (!e.alive) continue;
@@ -537,6 +605,11 @@ export default function Game({ level, onLevelComplete }: Props) {
           if (Math.abs(s.px - e.x) < TUTORIAL_RANGE) {
             tutorialRef.current.enemyId = e.id;
             tutorialRef.current.shownAt = performance.now();
+            try {
+              window.localStorage.setItem(TUTORIAL_LS_KEY, "true");
+            } catch {
+              // ignore
+            }
             break;
           }
         }
@@ -546,11 +619,6 @@ export default function Game({ level, onLevelComplete }: Props) {
         if (elapsed > TUTORIAL_DURATION_MS) {
           tutorialRef.current.enemyId = null;
           tutorialRef.current.dismissed = true;
-          try {
-            window.sessionStorage.setItem(TUTORIAL_SS_KEY, "true");
-          } catch {
-            // ignore
-          }
         }
       }
 
@@ -906,17 +974,56 @@ export default function Game({ level, onLevelComplete }: Props) {
             <p>This is the problem I&apos;m solving today.</p>
             <p>The level after this is up to whoever hires me next.</p>
           </div>
-          <a
-            href={HIRING_MAILTO}
-            onClick={dismissBossToast}
-            className="mt-4 flex items-center justify-center gap-2 rounded-md px-4 py-2.5 font-pixel text-[11px] uppercase tracking-[0.18em] text-white transition"
-            style={{ background: "#DC2626" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#B91C1C")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "#DC2626")}
-          >
-            <span aria-hidden>✉</span>
-            <span>Hiring? Let&apos;s chat →</span>
-          </a>
+
+          <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-400">
+            Pick your channel:
+          </p>
+          <div className="mt-2 flex flex-col gap-2">
+            <a
+              href={HIRING_MAILTO}
+              onClick={handleEmailClick}
+              className="flex items-center gap-3 rounded-md px-4 py-2.5 font-pixel text-[11px] uppercase tracking-[0.18em] text-white transition"
+              style={{ background: "#DC2626" }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#B91C1C")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "#DC2626")}
+            >
+              <span className="text-base" aria-hidden>✉</span>
+              <span className="flex-1 text-left">Email me directly</span>
+              <span aria-hidden>→</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={handleCopyEmail}
+              aria-live="polite"
+              className="flex items-center gap-3 rounded-md border border-white/15 bg-white/5 px-4 py-2.5 font-pixel text-[11px] uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
+            >
+              <span className="text-base" aria-hidden>
+                {emailCopied ? "✓" : "📋"}
+              </span>
+              <span className="flex-1 text-left">
+                {emailCopied ? "Copied!" : "Copy my email"}
+              </span>
+            </button>
+
+            <a
+              href={HIRING_LINKEDIN}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={dismissBossToast}
+              className="flex items-center gap-3 rounded-md border border-white/15 bg-white/5 px-4 py-2.5 font-pixel text-[11px] uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
+            >
+              <span
+                className="grid h-5 w-5 place-items-center rounded-sm font-bold"
+                style={{ background: "#0A66C2", fontSize: 10 }}
+                aria-hidden
+              >
+                in
+              </span>
+              <span className="flex-1 text-left">LinkedIn DM</span>
+              <span aria-hidden>→</span>
+            </a>
+          </div>
         </div>
       </div>
     </div>
