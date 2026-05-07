@@ -2,7 +2,9 @@ import Link from "next/link";
 import { getLevel } from "@/lib/levels";
 import PlayClient from "./PlayClient";
 
-const KNOWN_BONUS = new Set(["skills", "contact"]);
+// "skills" has its own static route at app/play/skills/page.tsx, so the
+// dynamic route only needs to handle "contact" as a known-bonus stub.
+const KNOWN_BONUS = new Set(["contact"]);
 
 export default async function PlayLevelPage({
   params,
@@ -19,9 +21,9 @@ export default async function PlayLevelPage({
   if (KNOWN_BONUS.has(slug)) {
     return (
       <ComingSoonGeneric
-        title={slug === "skills" ? "Skills Tree" : "Contact"}
+        title="Contact"
         subtitle="Bonus stage · coming soon"
-        theme={slug === "skills" ? "#A855F7" : "#F59E0B"}
+        theme="#F59E0B"
       />
     );
   }

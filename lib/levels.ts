@@ -199,7 +199,6 @@ export const levels: Level[] = [
         "25 min to <10 min",
         "5% to 9% conversion",
         "3x active users YoY",
-        "0 regulatory escalations",
       ],
     },
   },

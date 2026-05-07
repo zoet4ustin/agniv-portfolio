@@ -94,6 +94,35 @@ body {
 }
 .animate-press-start { animation: pressStartPulse 1.6s ease-in-out infinite; }
 
+/* Skill Constellation — twinkling background dots. */
+@keyframes constellationTwinkle {
+  0%, 100% { opacity: 0.15; }
+  50%      { opacity: 0.6;  }
+}
+
+/* Skill Constellation — Mask Dude idle frame loop driven via CSS
+   background-position. Sheet is 352x32 with 11 frames of 32x32.
+   (Kept around in case any future scene needs it; the constellation
+    exhibit itself no longer renders a player sprite.) */
+@keyframes maskDudeIdle {
+  from { background-position: 0       0; }
+  to   { background-position: -352px  0; }
+}
+
+/* Star hover bounce. Applied to the SVG <g> wrapper so the inner
+   <circle> translates without transform-origin headaches. */
+@keyframes starBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+
+/* Confetti when all 12 stars are inspected — CSS-only. Pieces drop and
+   spin once, then garbage-collect themselves via opacity 0. */
+@keyframes confettiFall {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(110vh) rotate(540deg); opacity: 0; }
+}
+
 /* Section fade-in for the story page. */
 @keyframes fadeUp {
   0%   { opacity: 0; transform: translateY(8px); }

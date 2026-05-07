@@ -234,7 +234,10 @@ function LevelMap() {
                 Bonus Stage
               </div>
               <div className="font-pixel text-sm text-white sm:text-base">
-                Skills Tree
+                Skill Constellation
+              </div>
+              <div className="mt-1 font-mono text-[11px] text-zinc-400">
+                12 capabilities, 3 clusters
               </div>
             </div>
           </Link>
