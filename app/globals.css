@@ -74,6 +74,16 @@ body {
   transform-origin: center;
 }
 
+/* Tighter version used by the in-game rotate-for-fullscreen overlay. */
+@keyframes rotatePhonePrompt {
+  0%, 35%   { transform: rotate(0deg); }
+  65%, 100% { transform: rotate(-90deg); }
+}
+.animate-rotate-phone-prompt {
+  animation: rotatePhonePrompt 1.5s ease-in-out infinite;
+  transform-origin: center;
+}
+
 /* Caret blink for "PRESS START" hero. */
 @keyframes blink {
   0%, 50%   { opacity: 1; }

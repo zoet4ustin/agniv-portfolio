@@ -145,8 +145,8 @@ export default function Game({ level, onLevelComplete }: Props) {
   const emailCopiedTimerRef = useRef<number | null>(null);
   const [isTouch, setIsTouch] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
-  // Banner is per-mount: navigating away and back re-shows it.
-  const [bannerDismissed, setBannerDismissed] = useState(false);
+  // One-time rotate-for-fullscreen overlay (per-level, per-session).
+  const [showRotatePrompt, setShowRotatePrompt] = useState(false);
   // Intro card — shown once per level per session.
   const [showIntro, setShowIntro] = useState(false);
   // Boss "still fighting" toast — only on Cars24, only the first stomp.
@@ -233,11 +233,41 @@ export default function Game({ level, onLevelComplete }: Props) {
     };
   }, []);
 
-  // Portrait banner: per-mount only — no persistence. Navigating away and
-  // back re-mounts the component and the banner reappears.
-  const dismissBanner = useCallback(() => {
-    setBannerDismissed(true);
-  }, []);
+  // Rotate-for-fullscreen overlay — per-level, per-session sessionStorage.
+  const rotatePromptKey = `rotate_prompt_seen_${level.slug}`;
+  const dismissRotatePrompt = useCallback(() => {
+    setShowRotatePrompt(false);
+    try {
+      window.sessionStorage.setItem(rotatePromptKey, "true");
+    } catch {
+      // storage disabled — fine, in-memory dismissal still works for this view
+    }
+  }, [rotatePromptKey]);
+
+  // Decide when to surface the rotate overlay. Waits until the intro card
+  // (if any) is dismissed so they don't stack.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (showIntro) return;
+    if (!isTouch || !isPortrait) {
+      setShowRotatePrompt(false);
+      return;
+    }
+    let seen = false;
+    try {
+      seen = window.sessionStorage.getItem(rotatePromptKey) === "true";
+    } catch {
+      // ignore
+    }
+    if (!seen) setShowRotatePrompt(true);
+  }, [showIntro, isTouch, isPortrait, rotatePromptKey]);
+
+  // Auto-dismiss when the user actually rotates to landscape.
+  useEffect(() => {
+    if (showRotatePrompt && !isPortrait) {
+      dismissRotatePrompt();
+    }
+  }, [showRotatePrompt, isPortrait, dismissRotatePrompt]);
 
   // Intro card — once per level, ever (localStorage). Pauses physics + input
   // while visible. Flag is set the moment the card is shown, so navigating
@@ -286,10 +316,20 @@ export default function Game({ level, onLevelComplete }: Props) {
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [showIntro, dismissIntro]);
 
-  // Sync the paused ref (game loop reads this each tick).
+  // Sync the paused ref — physics + input freeze whenever any modal-style
+  // overlay is up.
   useEffect(() => {
-    pausedRef.current = showIntro;
-  }, [showIntro]);
+    const paused = showIntro || showRotatePrompt;
+    pausedRef.current = paused;
+    if (paused) {
+      // Clear input flags so a key/button still held when the pause hits
+      // doesn't carry over after dismiss.
+      keysRef.current.left = false;
+      keysRef.current.right = false;
+      keysRef.current.jump = false;
+      keysRef.current.jumpQueued = false;
+    }
+  }, [showIntro, showRotatePrompt]);
 
   // Boss toast — persistent localStorage flag, checked once per mount.
   useEffect(() => {
@@ -376,22 +416,22 @@ export default function Game({ level, onLevelComplete }: Props) {
     const isRight = (k: string) => k === "ArrowRight" || k === "d" || k === "D";
 
     const onDown = (e: KeyboardEvent) => {
-      if (e.repeat) return;
+      const ourKey = isLeft(e.key) || isRight(e.key) || isJumpKey(e.key);
+      if (ourKey) e.preventDefault(); // suppress page scroll on every repeat
+      if (e.repeat) return; // booleans only need one transition; ignore repeats
       if (pausedRef.current) return;
       if (isLeft(e.key)) {
         keysRef.current.left = true;
-        e.preventDefault();
       } else if (isRight(e.key)) {
         keysRef.current.right = true;
-        e.preventDefault();
       } else if (isJumpKey(e.key)) {
         if (!keysRef.current.jump) keysRef.current.jumpQueued = true;
         keysRef.current.jump = true;
-        e.preventDefault();
       }
     };
+    // keyup always runs — even during pause — so a key released while a
+    // modal is up doesn't stay stuck "down" once we resume.
     const onUp = (e: KeyboardEvent) => {
-      if (pausedRef.current) return;
       if (isLeft(e.key)) keysRef.current.left = false;
       else if (isRight(e.key)) keysRef.current.right = false;
       else if (isJumpKey(e.key)) keysRef.current.jump = false;
@@ -736,10 +776,14 @@ export default function Game({ level, onLevelComplete }: Props) {
       }
 
       // Enemies (sprites from 20 Enemies.png crops, with rectangle fallback).
+      // Treat narrow viewports + touch devices as "mobile" for label sizing.
       const renderNow = performance.now();
+      const isMobileLabel =
+        isTouchRef.current ||
+        (typeof window !== "undefined" && window.innerWidth < 700);
       for (const e of s.enemies) {
         if (!e.alive) continue;
-        drawEnemy(ctx, e, enemyAtlas.image, s.cameraX, renderNow);
+        drawEnemy(ctx, e, enemyAtlas.image, s.cameraX, renderNow, isMobileLabel);
       }
 
       // Tutorial hint above the chosen enemy.
@@ -804,7 +848,6 @@ export default function Game({ level, onLevelComplete }: Props) {
   }, []);
 
   const noSelect = "game-no-select";
-  const showBanner = isTouch && isPortrait && !bannerDismissed;
 
   // Reusable canvas element — uses the callback ref so the game loop's
   // useEffect re-runs if React remounts the element across layout swaps.
@@ -1029,6 +1072,54 @@ export default function Game({ level, onLevelComplete }: Props) {
     </div>
   ) : null;
 
+  // Rotate-for-fullscreen overlay — first portrait visit per chapter.
+  const rotatePromptEl = showRotatePrompt ? (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rotate-prompt-title"
+      className="fixed inset-0 z-[60] flex items-center justify-center px-4 game-no-select"
+      style={{ background: "rgba(0,0,0,0.85)" }}
+    >
+      <div
+        className="rounded-2xl border border-white/10 bg-zinc-950 p-6 text-center shadow-2xl"
+        style={{ maxWidth: 320, width: "calc(100vw - 32px)" }}
+      >
+        {/* Phone rotating 90deg, ~1.5s ease-in-out */}
+        <div className="mx-auto mb-5 flex h-16 w-10 items-center justify-center rounded-md border-2 border-white/80 animate-rotate-phone-prompt">
+          <div className="h-1 w-5 rounded-full bg-white/80" />
+        </div>
+        <h2
+          id="rotate-prompt-title"
+          className="font-pixel text-[18px] uppercase tracking-[0.18em] text-white"
+        >
+          Rotate for Fullscreen
+        </h2>
+        <p
+          className="mt-3 font-mono leading-[1.6] text-zinc-300"
+          style={{ fontSize: 13, opacity: 0.7 }}
+        >
+          This game plays best in landscape. You can still play in portrait if
+          you prefer.
+        </p>
+        <button
+          type="button"
+          onClick={dismissRotatePrompt}
+          className="mt-6 w-full rounded-md bg-white px-4 py-3 font-mono text-[14px] font-bold text-zinc-900 transition hover:bg-zinc-100"
+        >
+          Rotate to landscape ↻
+        </button>
+        <button
+          type="button"
+          onClick={dismissRotatePrompt}
+          className="mt-3 font-mono text-[12px] text-white/60 underline-offset-4 transition hover:text-white hover:underline"
+        >
+          Continue in portrait
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   // ─── PORTRAIT (touch + portrait): HUD bar / canvas / joystick zone ─────
   if (isTouch && isPortrait) {
     return (
@@ -1051,22 +1142,6 @@ export default function Game({ level, onLevelComplete }: Props) {
           </Link>
         </div>
 
-        {/* Dismissible rotate banner */}
-        {showBanner && (
-          <div className={`flex items-center justify-between border-b border-white/10 bg-black/55 px-3 py-1.5 backdrop-blur ${noSelect}`}>
-            <span className="font-mono text-[10px] text-white">
-              ↻ Rotate phone for fullscreen experience
-            </span>
-            <button
-              type="button"
-              onClick={dismissBanner}
-              aria-label="Dismiss banner"
-              className="ml-2 px-1 text-base leading-none text-white/70 hover:text-white"
-            >
-              ×
-            </button>
-          </div>
-        )}
 
         {/* Canvas zone — flex-1 with explicit min-height so it always has
             a real height inside the column, even before children fill in.
@@ -1082,17 +1157,25 @@ export default function Game({ level, onLevelComplete }: Props) {
             style={{ background: level.theme }}
             aria-hidden
           />
-          {canvasNode("absolute inset-0 block h-full w-full object-contain")}
+          {/* object-cover: fills the zone's vertical space with no top/bottom
+              bars. The canvas's 2:1 content overflows horizontally; the
+              camera keeps the player centered so the cropping is symmetric
+              and never hides the action. */}
+          {canvasNode("absolute inset-0 block h-full w-full object-cover")}
           {toastEl}
           {chipEl}
         </div>
 
         {/* Joystick zone */}
-        <div className={`relative bg-black border-t border-white/10 ${noSelect}`} style={{ height: 120 }}>
+        <div
+          className={`relative bg-black border-t border-white/10 ${noSelect}`}
+          style={{ height: 140 }}
+        >
           <MobileControls onPress={handleMobilePress} />
         </div>
 
         {introEl}
+        {rotatePromptEl}
         {bossToastEl}
       </div>
     );
@@ -1210,7 +1293,8 @@ function drawEnemy(
   e: EnemyState,
   atlas: HTMLImageElement | null,
   cameraX: number,
-  now: number
+  now: number,
+  isMobile: boolean
 ) {
   const drawSize = e.spriteSize;
   const drawX = e.x + ENEMY_W / 2 - drawSize / 2;
@@ -1220,8 +1304,8 @@ function drawEnemy(
   if (e.isCurrentBattle) {
     const cx = drawX + drawSize / 2;
     const cy = drawY + drawSize / 2;
-    const radius = drawSize * 0.7; // 1.4x sprite radius
-    const pulse = 0.4 + Math.sin(now / 200) * 0.2; // 0.2 ↔ 0.6
+    const radius = drawSize * 0.7;
+    const pulse = 0.4 + Math.sin(now / 200) * 0.2;
     const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
     gradient.addColorStop(0, `rgba(220, 38, 38, ${pulse})`);
     gradient.addColorStop(1, "rgba(220, 38, 38, 0)");
@@ -1229,7 +1313,6 @@ function drawEnemy(
     ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
   }
 
-  // Sprite (or rectangle fallback during atlas load).
   if (atlas) {
     const crop = ASSETS.enemySheet.crops[e.spriteKey];
     ctx.drawImage(atlas, crop.sx, crop.sy, crop.sw, crop.sh, drawX, drawY, drawSize, drawSize);
@@ -1238,13 +1321,20 @@ function drawEnemy(
     ctx.fillRect(e.x, e.y, ENEMY_W, ENEMY_H);
   }
 
-  // Boss lock icon — top-right corner of sprite.
   if (e.isCurrentBattle) {
     drawLockIcon(ctx, drawX + drawSize - 14, drawY + 2, 12);
   }
 
-  // ─── Label pill(s) — clamped within camera viewport so nothing crops.
-  ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  // ─── Label pill(s) — clamped within camera viewport, padding-aware.
+  const fontSize = isMobile ? 12 : 11;
+  const hPad = isMobile ? 8 : 8;
+  const vPad = isMobile ? 4 : 3;
+  const radius = isMobile ? 4 : 0;
+  const margin = 4; // distance from camera edges
+  const bodyBg = isMobile ? "rgba(0,0,0,0.92)" : "rgba(0,0,0,0.85)";
+  const bodyBorder = isMobile ? "rgba(255,255,255,0.15)" : undefined;
+
+  ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
@@ -1256,36 +1346,88 @@ function drawEnemy(
     border?: string
   ) => {
     const tw = ctx.measureText(text).width;
-    const padding = 8;
-    const pillW = tw + padding * 2;
-    const pillH = 18;
+    const pillW = tw + hPad * 2;
+    const pillH = fontSize + vPad * 2;
     const desiredX = e.x + ENEMY_W / 2 - pillW / 2;
-    const minX = cameraX + 4;
-    const maxX = cameraX + CANVAS_W - 4 - pillW;
+    const minX = cameraX + margin;
+    const maxX = cameraX + CANVAS_W - margin - pillW;
     const pillX = Math.round(clamp(desiredX, minX, maxX));
     const pillY = Math.round(midY - pillH / 2);
+
     ctx.fillStyle = bg;
-    ctx.fillRect(pillX, pillY, pillW, pillH);
-    if (border) {
-      ctx.strokeStyle = border;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(pillX + 0.5, pillY + 0.5, pillW - 1, pillH - 1);
+    if (radius > 0) {
+      tracePill(ctx, pillX, pillY, pillW, pillH, radius);
+      ctx.fill();
+      if (border) {
+        ctx.strokeStyle = border;
+        ctx.lineWidth = 1;
+        tracePill(ctx, pillX + 0.5, pillY + 0.5, pillW - 1, pillH - 1, radius);
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillRect(pillX, pillY, pillW, pillH);
+      if (border) {
+        ctx.strokeStyle = border;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(pillX + 0.5, pillY + 0.5, pillW - 1, pillH - 1);
+      }
     }
     ctx.fillStyle = fg;
     ctx.fillText(text, pillX + pillW / 2, midY + 0.5);
   };
 
+  // Position pills 8px above the enemy on mobile, otherwise existing offset.
+  const pillH = fontSize + vPad * 2;
+  const gap = isMobile ? 8 : 18 - pillH / 2; // mobile: pill bottom 8px above e.y
+
   if (e.isCurrentBattle) {
-    // Top: BOSS pill (red).
-    drawPill("BOSS · STILL ALIVE", drawY - 22, "rgba(127,29,29,0.95)", "#FFFFFF", "#DC2626");
-    // Below sprite: small muted problem-name pill.
-    drawPill(e.label, drawY + drawSize + 14, "rgba(0,0,0,0.7)", "#cbd5e1");
+    const bossPillH = pillH;
+    const bossMidY = drawY - gap - bossPillH / 2;
+    drawPill(
+      "BOSS · STILL ALIVE",
+      bossMidY,
+      "rgba(127,29,29,0.95)",
+      "#FFFFFF",
+      "#DC2626"
+    );
+    // Smaller pill below the sprite with the actual problem name.
+    drawPill(
+      e.label,
+      drawY + drawSize + gap + pillH / 2,
+      "rgba(0,0,0,0.7)",
+      "#cbd5e1",
+      bodyBorder
+    );
   } else {
-    drawPill(`PROBLEM: ${e.label}`, e.y - 18, "rgba(0,0,0,0.85)", "#FFFFFF");
+    const midY = e.y - gap - pillH / 2;
+    drawPill(`PROBLEM: ${e.label}`, midY, bodyBg, "#FFFFFF", bodyBorder);
   }
 
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
+}
+
+// Rounded-rect path so the label pills look soft on small screens.
+function tracePill(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+  ctx.lineTo(x + w, y + h - rr);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  ctx.lineTo(x + rr, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+  ctx.lineTo(x, y + rr);
+  ctx.quadraticCurveTo(x, y, x + rr, y);
+  ctx.closePath();
 }
 
 // Tiny pixel padlock — drawn with rectangles. Red body, white shackle.

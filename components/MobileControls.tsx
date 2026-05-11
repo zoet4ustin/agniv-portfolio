@@ -55,7 +55,15 @@ export default function MobileControls({ onPress }: Props) {
           type="button"
           aria-label="Move left"
           className={`group ${outerBase} h-22 w-22`}
-          style={{ height: 88, width: 88, background: "transparent", border: "none" }}
+          style={{
+            height: 88,
+            width: 88,
+            background: "transparent",
+            border: "none",
+            touchAction: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
+          }}
           {...bind("left")}
         >
           <span
@@ -69,7 +77,15 @@ export default function MobileControls({ onPress }: Props) {
           type="button"
           aria-label="Move right"
           className={`group ${outerBase}`}
-          style={{ height: 88, width: 88, background: "transparent", border: "none" }}
+          style={{
+            height: 88,
+            width: 88,
+            background: "transparent",
+            border: "none",
+            touchAction: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
+          }}
           {...bind("right")}
         >
           <span
@@ -85,7 +101,15 @@ export default function MobileControls({ onPress }: Props) {
           type="button"
           aria-label="Jump"
           className={`group ${outerBase}`}
-          style={{ height: 96, width: 96, background: "transparent", border: "none" }}
+          style={{
+            height: 96,
+            width: 96,
+            background: "transparent",
+            border: "none",
+            touchAction: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
+          }}
           {...bind("jump")}
         >
           <span
