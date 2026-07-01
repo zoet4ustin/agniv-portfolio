@@ -27,12 +27,11 @@ const ROLES: Role[] = [
       "Launched Garage, a personalized vehicle-management surface inside CarInfo. Drove ~20K cars added in the first two months and ramped the feature to ~₹5 Cr/month gross sales run-rate, opening a new revenue line for the platform.",
       "Lifted Created-to-Pay funnel from 20% to 35% in one quarter through three coordinated bets: a dynamic, intent-aware bottom sheet; a personalization screen tied to vehicle and source signals; and a Lead Management module that sequences nudges by predicted purchase intent.",
       "Grew Service History gross sales by 25% and net profit by 20% in a single quarter (net sales steady at ~₹30 lakh/month) by re-pricing low-margin SKUs, tightening the booking funnel, and reducing vendor-side leakage.",
-      "Replaced third-party CRM with an in-house, AI-built CRM. Scoped, prototyped, and shipped with a 2-person team in an internal AI hackathon. Served the 10-person operations org, eliminating recurring license spend and unlocking custom workflows the vendor could not support.",
-      "Built a behavioral Lead Scoring layer that bucketed users by purchase-likelihood using install source, GA event patterns, in-app engagement, exit behavior, vehicle search intent, and demographics. Marketing targeted high-quality buckets first, driving a 25% lift in User-to-Lead conversion.",
+      "Replaced third-party CRM with an in-house, AI-built CRM. Scoped, prototyped, and shipped with a 2-person team in an internal AI hackathon. Serves the 10-person operations org, eliminating recurring license spend and unlocking custom workflows the vendor could not support.",
+      "Built a behavioral Lead Scoring layer that buckets users by purchase-likelihood using install source, GA event patterns, in-app engagement, exit behavior, vehicle search intent, and demographics. Marketing targets high-quality buckets first, driving a 25% lift in User-to-Lead conversion.",
       "Built a user prediction layer forecasting next-action sequence, churn probability, and intent. Output powered Growth cohorts and lifecycle marketing, contributing to higher product adoption and a ~20% lift in average sessions per user.",
-      "Migrated all consumer surfaces behind a BFF + CMS config layer. Every screen, banner, and CTA became non-engineering controllable, collapsing time-to-experiment from weeks to hours.",
-      "Shipped a Claude-based automated product-testing plugin (beta) that ran end-to-end regression on user-facing flows, reducing manual QA effort on every release.",
-      "Stickiness focus: DAU/MAU at 7%, typical for an RC-search-led acquisition pattern. Garage, lead-scoring, and prediction layers were the deliberate plays to convert one-time RC searchers into recurring users; the explicit metric I was hired against.",
+      "Migrated all consumer surfaces behind a BFF + CMS config layer. Non-engineers ship UI changes, collapsing time-to-experiment from weeks to hours.",
+      "Shipped a Claude-based automated product-testing plugin (beta) that runs end-to-end regression on user-facing flows, reducing manual QA effort on every release.",
     ],
   },
   {
@@ -63,12 +62,12 @@ const ROLES: Role[] = [
     ],
   },
   {
-    title: "Product Manager",
+    title: "Product Consultant",
     company: "Urbanic",
     dates: "Jan 2022 – Jun 2022",
     bullets: [
-      "Redesigned the consumer app based on India + Europe research; partnered with engineering to scale catalog and checkout APIs on AWS for the India launch. Contributed to a 30% lift in app installs over the launch period.",
-      "Benchmarked quick-fashion competitors and helped launch new product lines that opened ~20% incremental sales in the India market entry.",
+      "Advised on consumer app redesign for the India launch. Research across India and Europe fed a redesigned catalog and checkout experience; partnered with engineering on AWS-hosted APIs. Contributed to a ~30% lift in app installs over the launch period.",
+      "Benchmarked quick-fashion competitors and helped scope new product lines that opened ~20% incremental sales in the India market entry.",
     ],
   },
   {
@@ -76,19 +75,19 @@ const ROLES: Role[] = [
     company: "Flipkart",
     dates: "May 2019 – Jan 2022",
     subline:
-      "Fraud & risk management; protected millions of daily transactions on India's largest e-commerce platform",
+      "Fraud & risk management • Protected millions of daily transactions on India's largest e-commerce platform",
     bullets: [
       "Owned the FRM product roadmap, combining rule engine, ML-based risk scoring, and third-party intelligence APIs to identify fraud patterns in transaction data. Materially reduced fraud incidents on the platform.",
-      "Built scalable seller verification and risk-scoring workflows that improved authenticity detection (~15%) and supported regulatory compliance.",
+      "Built scalable seller verification and risk-scoring workflows that improved authenticity detection by ~15% and supported regulatory compliance.",
       "Worked directly on data-driven pattern discovery, translating analyst findings into shippable rules and feature requests for the ML team.",
     ],
   },
   {
-    title: "Product Analyst (Intern)",
+    title: "Product Consultant",
     company: "Myntra",
     dates: "Dec 2018 – May 2019",
     bullets: [
-      "Audited AI-generated customer-support transcripts at 90%+ accuracy, feeding labeled data back into model training. Also contributed front-end fixes and usability analysis on the consumer app.",
+      "Audited AI-generated customer-support transcripts at 90%+ accuracy, feeding labeled data back into model training. Contributed front-end fixes and usability analysis on the consumer app.",
     ],
   },
 ];
@@ -215,15 +214,16 @@ export default function ResumePage() {
         <Section title="Summary">
           <p className="font-mono text-[13px] leading-[1.7] text-zinc-200 sm:text-sm">
             Product leader with 7+ years across consumer fintech, e-commerce, and
-            AI-driven platforms, most recently led product for Cars24
-            (43M-MAU platform spanning CarInfo, VehicleInfo, Cars24). I ship
-            0-to-1 products under ambiguity, build and lead PM teams, and
-            operate close to the metric: high-reliability payments and credit at
-            Jupiter, ₹300 Cr+ rural commerce P&amp;L at Rozana, and platform-led
-            U2L and stickiness gains at Cars24. Comfortable building with AI;
-            have replaced vendor tooling with in-house, AI-built systems and
-            shipped behavioral lead-scoring and prediction layers used by
-            Marketing and Growth.
+            AI-driven platforms. Most recently led product for Cars24 — a 43M-MAU
+            platform spanning CarInfo, VehicleInfo, and Cars24 — reporting to the
+            CEO. Ship 0-to-1 products under ambiguity, build and lead PM teams,
+            and operate close to the metric: high-reliability payments and credit
+            at Jupiter Money, ₹300 Cr+ rural commerce P&amp;L at Rozana,
+            platform-led U2L and stickiness gains at Cars24. Comfortable building
+            with AI directly: have replaced vendor tooling with in-house,
+            AI-built systems and shipped behavioral lead-scoring and prediction
+            layers used by Marketing and Growth. Open to Product Leadership roles
+            across fintech, marketplaces, and AI-native consumer platforms.
           </p>
         </Section>
 
