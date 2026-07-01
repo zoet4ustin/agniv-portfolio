@@ -40,34 +40,12 @@ const MOBILE_VERTICAL_SHIFT = 40; // shift world up on mobile so action sits abo
 
 // One-time UX is persisted in localStorage so it survives tab close.
 const TUTORIAL_LS_KEY = "agniv_tutorial_jump_seen";
-const BOSS_TOAST_LS_KEY = "agniv_boss_toast_seen";
 const introLsKey = (slug: string) => `agniv_intro_seen_${slug}`;
-
-const HIRING_EMAIL = "connect.agnivkashyap@gmail.com";
-const HIRING_SUBJECT = "Hiring conversation";
-const HIRING_BODY =
-  "Hi Agniv,\n\nI played your portfolio and want to talk about a role.\n\n";
-const HIRING_LINKEDIN = "https://www.linkedin.com/in/connectagniv/";
-
-const HIRING_MAILTO = (() => {
-  const subject = encodeURIComponent(HIRING_SUBJECT);
-  const body = encodeURIComponent(HIRING_BODY);
-  return `mailto:${HIRING_EMAIL}?subject=${subject}&body=${body}`;
-})();
-
-const HIRING_GMAIL_COMPOSE = (() => {
-  const subject = encodeURIComponent(HIRING_SUBJECT);
-  const body = encodeURIComponent(HIRING_BODY);
-  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
-    HIRING_EMAIL
-  )}&su=${subject}&body=${body}`;
-})();
 
 type EnemyState = {
   id: string;
   label: string;
   solution: string;
-  isCurrentBattle: boolean;
   spriteKey: EnemySpriteKey;
   spriteSize: number;
   x: number;
@@ -92,7 +70,6 @@ function buildEnemies(level: Level): EnemyState[] {
       id: e.id,
       label: e.label,
       solution: e.solution,
-      isCurrentBattle: e.isCurrentBattle ?? false,
       spriteKey: e.spriteKey,
       spriteSize: e.spriteSize ?? 32,
       x: p.x,
@@ -140,18 +117,12 @@ export default function Game({ level, onLevelComplete }: Props) {
   const [latestSolution, setLatestSolution] = useState<ToastPayload | null>(null);
   const [chipKey, setChipKey] = useState(0);
   const [levelCompleted, setLevelCompleted] = useState(false);
-  // "Copied!" feedback for the boss toast's contact menu.
-  const [emailCopied, setEmailCopied] = useState(false);
-  const emailCopiedTimerRef = useRef<number | null>(null);
   const [isTouch, setIsTouch] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
   // One-time rotate-for-fullscreen overlay (per-level, per-session).
   const [showRotatePrompt, setShowRotatePrompt] = useState(false);
   // Intro card — shown once per level per session.
   const [showIntro, setShowIntro] = useState(false);
-  // Boss "still fighting" toast — only on Cars24, only the first stomp.
-  const [bossToast, setBossToast] = useState(false);
-  const [bossToastShown, setBossToastShown] = useState(false);
   // Canvas is referenced via state + callback ref so the game loop's
   // useEffect re-runs (and re-attaches its rAF + 2d context) whenever the
   // canvas DOM node changes — e.g. when the layout flips between portrait
@@ -183,11 +154,6 @@ export default function Game({ level, onLevelComplete }: Props) {
   const isPortraitRef = useRef(false);
   // Whether physics + input are paused (intro card up).
   const pausedRef = useRef(false);
-  // Tracks whether the boss toast has fired in this session — survives
-  // bouncing repeatedly off the boss without re-firing.
-  const bossToastSessionRef = useRef(false);
-  const bossToastTimerRef = useRef<number | null>(null);
-  const bossToastHideTimerRef = useRef<number | null>(null);
   const tutorialRef = useRef<TutorialState>({
     enemyId: null,
     shownAt: 0,
@@ -330,83 +296,6 @@ export default function Game({ level, onLevelComplete }: Props) {
       keysRef.current.jumpQueued = false;
     }
   }, [showIntro, showRotatePrompt]);
-
-  // Boss toast — persistent localStorage flag, checked once per mount.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      bossToastSessionRef.current =
-        window.localStorage.getItem(BOSS_TOAST_LS_KEY) === "true";
-    } catch {
-      bossToastSessionRef.current = false;
-    }
-  }, []);
-
-  // Boss toast stays open until the user explicitly dismisses it
-  // (× button, backdrop click, or contact-menu action). No auto-dismiss —
-  // this is a conversion moment, not a passing notification. Flag is
-  // written the moment the toast is triggered.
-  const triggerBossToast = useCallback(() => {
-    if (bossToastHideTimerRef.current) clearTimeout(bossToastHideTimerRef.current);
-    setBossToast(true);
-    setBossToastShown(false);
-    try {
-      window.localStorage.setItem(BOSS_TOAST_LS_KEY, "true");
-    } catch {
-      // ignore
-    }
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setBossToastShown(true));
-    });
-  }, []);
-
-  const dismissBossToast = useCallback(() => {
-    if (bossToastTimerRef.current) clearTimeout(bossToastTimerRef.current);
-    setBossToastShown(false);
-    if (bossToastHideTimerRef.current) clearTimeout(bossToastHideTimerRef.current);
-    bossToastHideTimerRef.current = window.setTimeout(() => {
-      setBossToast(false);
-    }, 320);
-  }, []);
-
-  // Email — desktop opens Gmail compose in a new tab (most desktop users
-  // don't have a default mail client). Mobile lets the <a href="mailto:">
-  // do its job; iOS Safari requires a real link, not a JS-triggered nav.
-  const handleEmailClick = useCallback(
-    (e: React.MouseEvent<HTMLAnchorElement>) => {
-      if (!isTouchRef.current) {
-        e.preventDefault();
-        window.open(HIRING_GMAIL_COMPOSE, "_blank", "noopener,noreferrer");
-      }
-      dismissBossToast();
-    },
-    [dismissBossToast]
-  );
-
-  const handleCopyEmail = useCallback(async () => {
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(HIRING_EMAIL);
-      } else {
-        // Legacy fallback for browsers without async clipboard API.
-        const ta = document.createElement("textarea");
-        ta.value = HIRING_EMAIL;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
-      setEmailCopied(true);
-      if (emailCopiedTimerRef.current) clearTimeout(emailCopiedTimerRef.current);
-      emailCopiedTimerRef.current = window.setTimeout(() => {
-        setEmailCopied(false);
-      }, 2000);
-    } catch (err) {
-      console.error("[Game] clipboard write failed", err);
-    }
-  }, []);
 
   // Keyboard
   useEffect(() => {
@@ -592,24 +481,6 @@ export default function Game({ level, onLevelComplete }: Props) {
 
         const playerBottom = s.py + PLAYER_H;
 
-        if (e.isCurrentBattle) {
-          // Boss: top-stomp bounces the player but doesn't kill the boss
-          // (it's the "still fighting" boss). Side touch is pass-through —
-          // player can navigate around it.
-          if (s.vy > 0 && playerBottom - e.y < 18) {
-            s.py = e.y - PLAYER_H;
-            s.vy = JUMP_V * 0.6;
-            s.onGround = false;
-            // Trigger the special boss toast on the first stomp attempt
-            // this session.
-            if (!bossToastSessionRef.current && level.slug === "cars24") {
-              bossToastSessionRef.current = true;
-              triggerBossToast();
-            }
-          }
-          continue;
-        }
-
         if (s.invincibleMs > 0) continue;
 
         if (s.vy > 0 && playerBottom - e.y < 18) {
@@ -641,7 +512,6 @@ export default function Game({ level, onLevelComplete }: Props) {
       if (!tutorialRef.current.dismissed && !tutorialRef.current.enemyId) {
         for (const e of s.enemies) {
           if (!e.alive) continue;
-          if (e.isCurrentBattle) continue; // boss has its own treatment
           if (Math.abs(s.px - e.x) < TUTORIAL_RANGE) {
             tutorialRef.current.enemyId = e.id;
             tutorialRef.current.shownAt = performance.now();
@@ -777,13 +647,12 @@ export default function Game({ level, onLevelComplete }: Props) {
 
       // Enemies (sprites from 20 Enemies.png crops, with rectangle fallback).
       // Treat narrow viewports + touch devices as "mobile" for label sizing.
-      const renderNow = performance.now();
       const isMobileLabel =
         isTouchRef.current ||
         (typeof window !== "undefined" && window.innerWidth < 700);
       for (const e of s.enemies) {
         if (!e.alive) continue;
-        drawEnemy(ctx, e, enemyAtlas.image, s.cameraX, renderNow, isMobileLabel);
+        drawEnemy(ctx, e, enemyAtlas.image, s.cameraX, isMobileLabel);
       }
 
       // Tutorial hint above the chosen enemy.
@@ -968,110 +837,6 @@ export default function Game({ level, onLevelComplete }: Props) {
     </div>
   ) : null;
 
-  // Boss "still fighting" toast — first stomp on the Cars24 boss only.
-  // No auto-dismiss: user closes via ×, backdrop tap, or the CTA. The
-  // mailto CTA is an <a> so iOS Safari treats it as a user-initiated
-  // link; the onClick still runs and dismisses the toast.
-  const bossToastEl = bossToast ? (
-    <div
-      role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="boss-toast-title"
-      className="fixed inset-0 z-40 flex items-start justify-center px-4 pt-6 game-no-select"
-      style={{ background: "rgba(0,0,0,0.5)" }}
-      onClick={dismissBossToast}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full sm:w-[400px]"
-        style={{
-          maxWidth: "calc(100vw - 32px)",
-          animation: bossToastShown
-            ? "lootDropIn 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards"
-            : "lootDropOut 0.3s ease-in forwards",
-          transformOrigin: "top center",
-        }}
-      >
-        <div
-          className="rounded-md border bg-[rgba(15,15,15,0.96)] p-4 shadow-2xl backdrop-blur sm:p-5"
-          style={{ borderColor: "#DC2626" }}
-        >
-          <button
-            type="button"
-            onClick={dismissBossToast}
-            aria-label="Dismiss"
-            className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-md text-base leading-none text-white transition hover:bg-[rgba(255,255,255,0.1)]"
-          >
-            ×
-          </button>
-          <div className="mb-2 flex items-center gap-2 pr-8">
-            <span className="text-red-500" aria-hidden>⚠</span>
-            <span
-              id="boss-toast-title"
-              className="font-pixel text-[11px] uppercase tracking-[0.2em] text-red-400"
-            >
-              Still Fighting This One
-            </span>
-          </div>
-          <div className="space-y-1 font-mono text-xs leading-relaxed text-white sm:text-[13px]">
-            <p>This is the problem I&apos;m solving today.</p>
-            <p>The level after this is up to whoever hires me next.</p>
-          </div>
-
-          <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-400">
-            Pick your channel:
-          </p>
-          <div className="mt-2 flex flex-col gap-2">
-            <a
-              href={HIRING_MAILTO}
-              onClick={handleEmailClick}
-              className="flex items-center gap-3 rounded-md px-4 py-2.5 font-pixel text-[11px] uppercase tracking-[0.18em] text-white transition"
-              style={{ background: "#DC2626" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#B91C1C")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "#DC2626")}
-            >
-              <span className="text-base" aria-hidden>✉</span>
-              <span className="flex-1 text-left">Email me directly</span>
-              <span aria-hidden>→</span>
-            </a>
-
-            <button
-              type="button"
-              onClick={handleCopyEmail}
-              aria-live="polite"
-              className="flex items-center gap-3 rounded-md border border-white/15 bg-white/5 px-4 py-2.5 font-pixel text-[11px] uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
-            >
-              <span className="text-base" aria-hidden>
-                {emailCopied ? "✓" : "📋"}
-              </span>
-              <span className="flex-1 text-left">
-                {emailCopied ? "Copied!" : "Copy my email"}
-              </span>
-            </button>
-
-            <a
-              href={HIRING_LINKEDIN}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={dismissBossToast}
-              className="flex items-center gap-3 rounded-md border border-white/15 bg-white/5 px-4 py-2.5 font-pixel text-[11px] uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
-            >
-              <span
-                className="grid h-5 w-5 place-items-center rounded-sm font-bold"
-                style={{ background: "#0A66C2", fontSize: 10 }}
-                aria-hidden
-              >
-                in
-              </span>
-              <span className="flex-1 text-left">LinkedIn DM</span>
-              <span aria-hidden>→</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
   // Rotate-for-fullscreen overlay — first portrait visit per chapter.
   const rotatePromptEl = showRotatePrompt ? (
     <div
@@ -1176,7 +941,6 @@ export default function Game({ level, onLevelComplete }: Props) {
 
         {introEl}
         {rotatePromptEl}
-        {bossToastEl}
       </div>
     );
   }
@@ -1240,7 +1004,6 @@ export default function Game({ level, onLevelComplete }: Props) {
       )}
 
       {introEl}
-      {bossToastEl}
     </div>
   );
 }
@@ -1293,25 +1056,11 @@ function drawEnemy(
   e: EnemyState,
   atlas: HTMLImageElement | null,
   cameraX: number,
-  now: number,
   isMobile: boolean
 ) {
   const drawSize = e.spriteSize;
   const drawX = e.x + ENEMY_W / 2 - drawSize / 2;
   const drawY = e.y + ENEMY_H - drawSize;
-
-  // Boss aura — pulsing red radial gradient behind the sprite.
-  if (e.isCurrentBattle) {
-    const cx = drawX + drawSize / 2;
-    const cy = drawY + drawSize / 2;
-    const radius = drawSize * 0.7;
-    const pulse = 0.4 + Math.sin(now / 200) * 0.2;
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-    gradient.addColorStop(0, `rgba(220, 38, 38, ${pulse})`);
-    gradient.addColorStop(1, "rgba(220, 38, 38, 0)");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-  }
 
   if (atlas) {
     const crop = ASSETS.enemySheet.crops[e.spriteKey];
@@ -1321,11 +1070,7 @@ function drawEnemy(
     ctx.fillRect(e.x, e.y, ENEMY_W, ENEMY_H);
   }
 
-  if (e.isCurrentBattle) {
-    drawLockIcon(ctx, drawX + drawSize - 14, drawY + 2, 12);
-  }
-
-  // ─── Label pill(s) — clamped within camera viewport, padding-aware.
+  // ─── Label pill — clamped within camera viewport, padding-aware.
   const fontSize = isMobile ? 12 : 11;
   const hPad = isMobile ? 8 : 8;
   const vPad = isMobile ? 4 : 3;
@@ -1380,28 +1125,8 @@ function drawEnemy(
   const pillH = fontSize + vPad * 2;
   const gap = isMobile ? 8 : 18 - pillH / 2; // mobile: pill bottom 8px above e.y
 
-  if (e.isCurrentBattle) {
-    const bossPillH = pillH;
-    const bossMidY = drawY - gap - bossPillH / 2;
-    drawPill(
-      "BOSS · STILL ALIVE",
-      bossMidY,
-      "rgba(127,29,29,0.95)",
-      "#FFFFFF",
-      "#DC2626"
-    );
-    // Smaller pill below the sprite with the actual problem name.
-    drawPill(
-      e.label,
-      drawY + drawSize + gap + pillH / 2,
-      "rgba(0,0,0,0.7)",
-      "#cbd5e1",
-      bodyBorder
-    );
-  } else {
-    const midY = e.y - gap - pillH / 2;
-    drawPill(`PROBLEM: ${e.label}`, midY, bodyBg, "#FFFFFF", bodyBorder);
-  }
+  const midY = e.y - gap - pillH / 2;
+  drawPill(`PROBLEM: ${e.label}`, midY, bodyBg, "#FFFFFF", bodyBorder);
 
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
@@ -1428,36 +1153,6 @@ function tracePill(
   ctx.lineTo(x, y + rr);
   ctx.quadraticCurveTo(x, y, x + rr, y);
   ctx.closePath();
-}
-
-// Tiny pixel padlock — drawn with rectangles. Red body, white shackle.
-function drawLockIcon(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number
-) {
-  const bodyH = Math.round(size * 0.6);
-  const bodyY = y + size - bodyH;
-  // White outline ring around body
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillRect(x - 1, bodyY - 1, size + 2, bodyH + 2);
-  // Red body
-  ctx.fillStyle = "#DC2626";
-  ctx.fillRect(x, bodyY, size, bodyH);
-  // Shackle — three rectangles approximating a U-shape, white outlined
-  const shackleH = Math.round(size * 0.55);
-  const shackleW = Math.round(size * 0.65);
-  const shackleX = x + Math.round((size - shackleW) / 2);
-  const shackleY = y;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillRect(shackleX - 1, shackleY - 1, shackleW + 2, 3);
-  ctx.fillRect(shackleX - 1, shackleY - 1, 3, shackleH);
-  ctx.fillRect(shackleX + shackleW - 2, shackleY - 1, 3, shackleH);
-  ctx.fillStyle = "#DC2626";
-  ctx.fillRect(shackleX, shackleY, shackleW, 1);
-  ctx.fillRect(shackleX, shackleY, 1, shackleH - 1);
-  ctx.fillRect(shackleX + shackleW - 1, shackleY, 1, shackleH - 1);
 }
 
 function drawTutorialHint(

@@ -132,7 +132,7 @@ export default function ContactExhibit() {
             {CONTACT.name}
           </h1>
           <p className="mt-3 font-mono text-[15px] text-zinc-300 opacity-90 sm:text-base">
-            {CONTACT.role} · {CONTACT.currentCompany}
+            {CONTACT.role}
           </p>
           <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-xs text-zinc-400">
             <PinIcon />

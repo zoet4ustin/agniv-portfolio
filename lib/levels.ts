@@ -4,7 +4,6 @@ export type Enemy = {
   id: string;
   label: string;
   solution: string;
-  isCurrentBattle?: boolean;
   spriteKey: EnemySpriteKey;
   // Display size on canvas (px). Boss enemies render larger.
   spriteSize?: number;
@@ -321,11 +320,10 @@ export const levels: Level[] = [
       },
       {
         id: "dau-mau-stickiness",
-        label: "DAU/MAU stickiness",
-        solution: "Currently fighting — DAU/MAU climbing in real-time",
-        isCurrentBattle: true,
+        label: "DAU/MAU stickiness (7% baseline)",
+        solution:
+          "Handed off with a working playbook: Garage as recurring habit surface, behavioral lead scoring, and prediction cohorts as the levers. Left the team a system, not a project.",
         spriteKey: "skullCircle",
-        spriteSize: 48,
       },
     ],
     enemyPlacements: [
@@ -352,8 +350,7 @@ export const levels: Level[] = [
       },
       {
         enemyId: "dau-mau-stickiness",
-        // Patrols on Platform 4 — physics treats this enemy as pass-through
-        // (see Game.tsx). Visual + STILL FIGHTING badge in the modal only.
+        // Normal killable enemy patrolling Platform 4 (role closed Jun 2026).
         x: 1420,
         y: 240 - ENEMY_H,
         patrolMin: 1400,
@@ -363,11 +360,11 @@ export const levels: Level[] = [
     caseStudy: {
       title: "Platform-Led U2L & Stickiness at Cars24",
       problem:
-        "43M-MAU automotive platform across CarInfo, VehicleInfo, and Cars24. Most users come for RC search and leave. DAU/MAU at 7%. Created-to-Pay conversion at 20%. CEO wants U2L and stickiness fixed.",
+        "43M-MAU automotive platform across CarInfo, VehicleInfo, and Cars24. Most users came for RC search and left. DAU/MAU at 7%. Created-to-Pay conversion at 20%. CEO wanted U2L and stickiness fixed.",
       approach:
-        "Lead a 4-PM team reporting to CEO. Shipped Garage (new revenue surface), behavioral lead scoring + prediction layer powering Marketing cohorts, dynamic personalization screens, and a BFF + CMS config layer so non-engineers can ship UI changes.",
+        "Led a 4-PM team reporting to the CEO. Shipped Garage (new revenue surface), behavioral lead scoring + prediction layer powering Marketing cohorts, dynamic personalization screens, and a BFF + CMS config layer so non-engineers could ship UI changes.",
       outcome:
-        "Created-to-Pay funnel 20% to 35% in one quarter. Garage at ₹5 Cr/month run-rate within 2 months. +25% U2L from lead scoring. Service History gross sales +25%, net profit +20%.",
+        "Created-to-Pay funnel 20% to 35% in one quarter. Garage at ₹5 Cr/month run-rate within 2 months. +25% U2L from lead scoring. Service History gross sales +25%, net profit +20%. Handed off cleanly in June 2026 — left the team a working system, not a project.",
       metrics: [
         "Funnel 20% to 35%",
         "Garage ₹5 Cr/month",

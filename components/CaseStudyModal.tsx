@@ -21,7 +21,6 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
   }, [onClose]);
 
   const continueLabel = level.nextLevelSlug ? "Next level →" : "View final screen →";
-  const hasOngoing = level.enemies.some((e) => e.isCurrentBattle);
   const isLandscapeMobile = useMediaQuery(
     "(orientation: landscape) and (max-height: 500px)"
   );
@@ -53,7 +52,6 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
         {isLandscapeMobile ? (
           <LandscapeLayout
             level={level}
-            hasOngoing={hasOngoing}
             continueLabel={continueLabel}
             onClose={onClose}
             onContinue={onContinue}
@@ -61,7 +59,6 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
         ) : (
           <PortraitLayout
             level={level}
-            hasOngoing={hasOngoing}
             continueLabel={continueLabel}
             onClose={onClose}
             onContinue={onContinue}
@@ -74,13 +71,11 @@ export default function CaseStudyModal({ level, onClose, onContinue }: Props) {
 
 function PortraitLayout({
   level,
-  hasOngoing,
   continueLabel,
   onClose,
   onContinue,
 }: {
   level: Level;
-  hasOngoing: boolean;
   continueLabel: string;
   onClose: () => void;
   onContinue: () => void;
@@ -108,12 +103,6 @@ function PortraitLayout({
 
         <MetricsRow level={level} />
 
-        {hasOngoing && (
-          <p className="mt-4 text-sm italic text-zinc-300">
-            Some problems aren&apos;t solved yet. That&apos;s where you come in.
-          </p>
-        )}
-
         <BossesList level={level} />
       </div>
 
@@ -130,13 +119,11 @@ function PortraitLayout({
 
 function LandscapeLayout({
   level,
-  hasOngoing,
   continueLabel,
   onClose,
   onContinue,
 }: {
   level: Level;
-  hasOngoing: boolean;
   continueLabel: string;
   onClose: () => void;
   onContinue: () => void;
@@ -171,11 +158,6 @@ function LandscapeLayout({
           <div className="space-y-4">
             <SectionTight label="Outcome">{level.caseStudy.outcome}</SectionTight>
             <MetricsRow level={level} compact />
-            {hasOngoing && (
-              <p className="italic text-zinc-300" style={{ fontSize: 12 }}>
-                Some problems aren&apos;t solved yet. That&apos;s where you come in.
-              </p>
-            )}
             <BossesList level={level} compact />
           </div>
         </div>
@@ -265,17 +247,6 @@ function BossesList({ level, compact = false }: { level: Level; compact?: boolea
           >
             <span className="font-semibold text-zinc-100">{e.label}</span>
             <span className="text-zinc-400">— {e.solution}</span>
-            {e.isCurrentBattle && (
-              <span
-                className="rounded-full border border-red-500/60 bg-red-500/15 font-mono font-bold uppercase tracking-widest text-red-300"
-                style={{
-                  fontSize: compact ? 9 : 10,
-                  padding: compact ? "1px 6px" : "2px 8px",
-                }}
-              >
-                Still Fighting
-              </span>
-            )}
           </li>
         ))}
       </ul>

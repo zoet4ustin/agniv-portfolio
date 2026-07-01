@@ -20,19 +20,19 @@ const ROLES: Role[] = [
   {
     title: "AVP, Product",
     company: "Cars24 / CarInfo",
-    dates: "Oct 2025 – Present",
+    dates: "Oct 2025 – Jun 2026",
     subline:
-      "Reporting to CEO • Hybrid IC + people manager • Owns U2L and DAU/MAU mandate across CarInfo, VehicleInfo, Cars24 (43M MAU combined) • Team: 4 PMs, 4 engineers, 1 data analyst",
+      "Reported to CEO • Hybrid IC + people manager • Owned U2L and DAU/MAU mandate across CarInfo, VehicleInfo, Cars24 (43M MAU combined) • Team: 4 PMs, 4 engineers, 1 data analyst",
     bullets: [
       "Launched Garage, a personalized vehicle-management surface inside CarInfo. Drove ~20K cars added in the first two months and ramped the feature to ~₹5 Cr/month gross sales run-rate, opening a new revenue line for the platform.",
       "Lifted Created-to-Pay funnel from 20% to 35% in one quarter through three coordinated bets: a dynamic, intent-aware bottom sheet; a personalization screen tied to vehicle and source signals; and a Lead Management module that sequences nudges by predicted purchase intent.",
       "Grew Service History gross sales by 25% and net profit by 20% in a single quarter (net sales steady at ~₹30 lakh/month) by re-pricing low-margin SKUs, tightening the booking funnel, and reducing vendor-side leakage.",
-      "Replaced third-party CRM with an in-house, AI-built CRM. Scoped, prototyped, and shipped with a 2-person team in an internal AI hackathon. Now serves the 10-person operations org, eliminating recurring license spend and unlocking custom workflows the vendor could not support.",
-      "Built a behavioral Lead Scoring layer that buckets users by purchase-likelihood using install source, GA event patterns, in-app engagement, exit behavior, vehicle search intent, and demographics. Marketing now targets high-quality buckets first, driving a 25% lift in User-to-Lead conversion.",
-      "Built a user prediction layer forecasting next-action sequence, churn probability, and intent. Output powers Growth cohorts and lifecycle marketing, contributing to higher product adoption and a ~20% lift in average sessions per user.",
-      "Migrated all consumer surfaces behind a BFF + CMS config layer. Every screen, banner, and CTA is now non-engineering controllable, collapsing time-to-experiment from weeks to hours.",
-      "Shipped a Claude-based automated product-testing plugin (beta) that runs end-to-end regression on user-facing flows, reducing manual QA effort on every release.",
-      "Stickiness focus: DAU/MAU at 7%, typical for an RC-search-led acquisition pattern. Garage, lead-scoring, and prediction layers are the deliberate plays to convert one-time RC searchers into recurring users; the explicit metric I am hired against.",
+      "Replaced third-party CRM with an in-house, AI-built CRM. Scoped, prototyped, and shipped with a 2-person team in an internal AI hackathon. Served the 10-person operations org, eliminating recurring license spend and unlocking custom workflows the vendor could not support.",
+      "Built a behavioral Lead Scoring layer that bucketed users by purchase-likelihood using install source, GA event patterns, in-app engagement, exit behavior, vehicle search intent, and demographics. Marketing targeted high-quality buckets first, driving a 25% lift in User-to-Lead conversion.",
+      "Built a user prediction layer forecasting next-action sequence, churn probability, and intent. Output powered Growth cohorts and lifecycle marketing, contributing to higher product adoption and a ~20% lift in average sessions per user.",
+      "Migrated all consumer surfaces behind a BFF + CMS config layer. Every screen, banner, and CTA became non-engineering controllable, collapsing time-to-experiment from weeks to hours.",
+      "Shipped a Claude-based automated product-testing plugin (beta) that ran end-to-end regression on user-facing flows, reducing manual QA effort on every release.",
+      "Stickiness focus: DAU/MAU at 7%, typical for an RC-search-led acquisition pattern. Garage, lead-scoring, and prediction layers were the deliberate plays to convert one-time RC searchers into recurring users; the explicit metric I was hired against.",
     ],
   },
   {
@@ -215,7 +215,7 @@ export default function ResumePage() {
         <Section title="Summary">
           <p className="font-mono text-[13px] leading-[1.7] text-zinc-200 sm:text-sm">
             Product leader with 7+ years across consumer fintech, e-commerce, and
-            AI-driven platforms, most recently leading product for Cars24
+            AI-driven platforms, most recently led product for Cars24
             (43M-MAU platform spanning CarInfo, VehicleInfo, Cars24). I ship
             0-to-1 products under ambiguity, build and lead PM teams, and
             operate close to the metric: high-reliability payments and credit at

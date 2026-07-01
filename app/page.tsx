@@ -9,7 +9,7 @@ const TEASERS: Record<string, string> = {
   flipkart: "fraud, at the scale of a billion users",
   jupiter: "credit, payments, and trust",
   rozana: "₹300 Cr+ in rural commerce",
-  cars24: "the chapter still being written",
+  cars24: "U2L, stickiness, and a system handed off",
 };
 
 // Per-level brand palette for the chapter cards.
@@ -24,7 +24,8 @@ const CARD_THEME: Record<
     bg: "#047BD5",
     numberColor: "#FFFFFF",
     bodyColor: "#FFFFFF",
-    accentBorder: "#FF3B30",
+    // Muted amber — marks the most-recent role without the urgent red glow.
+    accentBorder: "rgba(245,158,11,0.4)",
   },
 };
 
@@ -150,7 +151,7 @@ function Story() {
     "Mine is a level you can walk through.",
     "Every problem is real.",
     "Every solution shipped.",
-    "The last level is still being written.",
+    "Four levels cleared. Ready for the next.",
   ];
   return (
     <section
@@ -299,11 +300,8 @@ function LevelCard({
       style={{
         background: palette.bg,
         boxShadow: isCurrent
-          ? `0 0 0 2px ${palette.accentBorder ?? "#FF3B30"}, 0 0 24px -4px ${
-              palette.accentBorder ?? "#FF3B30"
-            }aa`
+          ? `0 0 0 1.5px ${palette.accentBorder ?? "rgba(245,158,11,0.4)"}`
           : "0 0 0 1px rgba(0,0,0,0.15)",
-        animation: isCurrent ? "blinkFast 1.8s steps(1, end) infinite" : undefined,
       }}
     >
       <div
@@ -343,14 +341,14 @@ function LevelCard({
           style={{
             background: "rgba(0,0,0,0.18)",
             color: palette.bodyColor,
-            border: `1px solid ${palette.accentBorder ?? "rgba(255,255,255,0.4)"}`,
+            border: `1px solid ${palette.accentBorder ?? "rgba(245,158,11,0.4)"}`,
           }}
         >
           <span
             className="h-1.5 w-1.5 rounded-full"
-            style={{ background: palette.accentBorder ?? "#FF3B30" }}
+            style={{ background: "rgba(255,255,255,0.45)" }}
           />
-          Now Playing
+          Most Recent
         </span>
       )}
     </Link>

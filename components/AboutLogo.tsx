@@ -163,7 +163,7 @@ export default function AboutLogo() {
               Role
             </p>
             <p className="mt-0.5 font-mono text-[13px] text-white">
-              AVP Product at Cars24
+              Product Leader
             </p>
           </div>
 

@@ -1,7 +1,6 @@
 export const CONTACT = {
   name: "Agniv Kashyap",
   role: "Product Leader",
-  currentCompany: "AVP Product at Cars24",
   location: "New Delhi, India",
 
   pitchLine:
